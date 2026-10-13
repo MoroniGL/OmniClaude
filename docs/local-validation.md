@@ -12,7 +12,7 @@ Repo state at install time: branch `stage1-core`, HEAD a9a048b.
 - `plugin marketplace add C:/CC/omniclaude`: marketplace `moronigl` added (directory source `C:\CC\omniclaude`).
 - `plugin install omniclaude@moronigl --scope user`: installed, scope user, enabled, version 0.1.0-alpha.1.
 - Disk changes made by the engine's `plugin` commands: `~/.claude/settings.json` gained `enabledPlugins` and `extraKnownMarketplaces` entries for `moronigl`; `~/.claude/plugins/known_marketplaces.json` and `installed_plugins.json` gained entries; a snapshot copy was written to `~/.claude/plugins/cache/moronigl/omniclaude/0.1.0-alpha.1`, pinned to commit a9a048b.
-- The installed copy is a snapshot. Working-tree edits reach it only after `claude plugin update omniclaude@moronigl`.
+- `claude plugin list` prints `Read from: C:\CC\omniclaude\plugins\omniclaude`, while `installed_plugins.json` records an installPath under `~/.claude/plugins/cache/moronigl/omniclaude/0.1.0-alpha.1` pinned to a9a048b. Which copy a session loads was not tested; if the cache copy is used, working-tree edits reach it only after `claude plugin update omniclaude@moronigl`.
 - `plugin details omniclaude@moronigl` (verbatim):
 
 ```
@@ -46,6 +46,11 @@ Per-component (rounded)
 ```
 
 ## Live delegation test (desktop session)
+
+- parent model: `claude-fable-5-1` (the Code-tab session's model, as set with `/model claude-fable-5-1` in that session; the parent transcript itself was not read)
+- prompt to omniclaude:luna-researcher (as run): `Today's date is 2026-10-13. Bounded task: list every Markdown (.md) file under C:\CC\omniclaude\docs\ (recursively) with its path relative to C:\CC\omniclaude, and report the total count. Do not read file contents beyond what Glob returns. Return the handoff format from your instructions.`
+- prompt to omniclaude:terra-explorer (as run): `Bounded question: in the repository C:\CC\omniclaude, where does the routing skill (plugins/omniclaude/skills/routing/SKILL.md) name each of the seven workers, and which test file asserts that every worker appears there? Return file paths with line ranges only. Use Grep; do not read whole files. Return the handoff format from your instructions.`
+- /tasks row: not obtained (the test was run from the controller session, where /tasks is not readable; the transcript `model` field was used instead).
 
 The headless `claude -p` smoke test could not run because the standalone engine is not logged in (see the next section). The delegation test was done inside the logged-in desktop Code-tab session instead.
 

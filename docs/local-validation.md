@@ -47,10 +47,10 @@ Per-component (rounded)
 
 ## Live delegation test (desktop session)
 
-- parent model: `claude-fable-5-1` (the Code-tab session's model, as set with `/model claude-fable-5-1` in that session; the parent transcript itself was not read)
+- parent model: `claude-fable-5-1`, the model of the Code-tab session that dispatched both workers (set in that session with `/model claude-fable-5-1`; the parent transcript itself was not read)
 - prompt to omniclaude:luna-researcher (as run): `Today's date is 2026-10-13. Bounded task: list every Markdown (.md) file under C:\CC\omniclaude\docs\ (recursively) with its path relative to C:\CC\omniclaude, and report the total count. Do not read file contents beyond what Glob returns. Return the handoff format from your instructions.`
 - prompt to omniclaude:terra-explorer (as run): `Bounded question: in the repository C:\CC\omniclaude, where does the routing skill (plugins/omniclaude/skills/routing/SKILL.md) name each of the seven workers, and which test file asserts that every worker appears there? Return file paths with line ranges only. Use Grep; do not read whole files. Return the handoff format from your instructions.`
-- /tasks row: not obtained (the test was run from the controller session, where /tasks is not readable; the transcript `model` field was used instead).
+- /tasks row: not obtained. The workers were dispatched programmatically from the same Code-tab session, so the served model was read from each worker's own transcript (`agent-a319e24c65d163482.jsonl` for luna-researcher, `agent-a20e3c990b13c2ef8.jsonl` for terra-explorer) instead of the /tasks UI.
 
 The headless `claude -p` smoke test could not run because the standalone engine is not logged in (see the next section). The delegation test was done inside the logged-in desktop Code-tab session instead.
 
@@ -89,4 +89,4 @@ Pending: the with/without-plugin eval (Task 9) runs after the standalone engine 
 
 - The effort level applied to each worker was not observable in transcripts. `/tasks` would show it in the UI, but it was not observed.
 - The two dispatches were explicit, so they do not measure whether Claude delegates on its own.
-- The installed copy is a snapshot pinned to commit a9a048b.
+- The installed copy recorded in installed_plugins.json is pinned to commit a9a048b; whether a session loads that copy or the working tree was not tested.

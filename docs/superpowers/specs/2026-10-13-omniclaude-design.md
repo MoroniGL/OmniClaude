@@ -74,7 +74,7 @@ plugins/omniclaude/
   skills/routing/SKILL.md              routing policy (section 7)
   skills/routing/references/           routing.md, efficiency.md (loaded on demand)
   profiles/                            economy|balanced|quality|max .settings.json (CLI --settings)
-docs/                                  architecture, routing, profiles, validation, releases
+docs/                                  architecture, profiles, local validation
 tests/                                 offline asset regression tests (stdlib unittest)
 .github/workflows/validate.yml         tests, compileall, whitespace check
 README.md  CHANGELOG.md  CONTRIBUTING.md  CLAUDE.md  LICENSE (MIT)  VERSION  .gitignore
@@ -95,10 +95,10 @@ cannot spawn nested subagents that bypass the tiers.
 | `luna-researcher` | haiku | medium | Read, Grep, Glob, WebSearch, WebFetch | read-only; `omitClaudeMd`; compact results to stay under Haiku's 100K price threshold |
 | `terra-explorer` | sonnet | low | Read, Grep, Glob, Bash | read-only code mapping; `omitClaudeMd` |
 | `terra-implementer` | sonnet | medium | inherited minus Agent | bounded implementation; loads project `CLAUDE.md` |
-| `sol-planner` | opus | medium | inherited minus Agent, Edit, Write | architecture and decomposition |
-| `sol-reviewer` | opus | medium | inherited minus Agent, Edit, Write | independent review; parent may request high per call |
+| `sol-planner` | opus | medium | inherited minus Agent, Edit, Write, NotebookEdit | architecture and decomposition |
+| `sol-reviewer` | opus | medium | inherited minus Agent, Edit, Write, NotebookEdit | independent review; parent may request high per call |
 | `sol-debugger` | opus | high | inherited minus Agent | root-cause debugging |
-| `astra-expert` | fable | low | inherited minus Agent | exceptional escalation only: explicit user request or a failed sol attempt; re-run at high on failure |
+| `astra-expert` | fable | low | inherited minus Agent | exceptional escalation only, and only after the user explicitly agrees (also after a failed sol attempt); re-run at high on failure, again with agreement |
 
 There are two deliberate differences from OmniCodex, both documented in the README:
 
@@ -155,7 +155,7 @@ The body is small, and the references load on demand. It is a port of OmniCodex'
 3. Escalation ladder for checkable work:
    - On a failure, raise effort on the same model.
    - Then move to the next tier at low effort.
-   - astra comes last, and only on user consent or after a failed sol attempt.
+   - astra comes last, and only after the user explicitly agrees, including after a failed sol attempt.
 4. Parallelize only independent read-only work; keep dependent chains in the parent.
 5. Never claim a model switch; report requested, observed, and verified separately.
 6. Compact handoff format and soft word targets, carried over from OmniCodex

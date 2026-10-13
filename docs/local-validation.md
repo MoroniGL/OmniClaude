@@ -81,6 +81,16 @@ Two bounded tasks were dispatched from the parent, a Fable 5.1 session:
 - Because of this, the headless `-p` delegation test did not run.
 - The user chose to log the engine in (`claude.exe auth login`). That step was pending at the time of writing.
 
+## Acceptance status (spec §8.3)
+
+| Criterion | Status | Evidence |
+|---|---|---|
+| Install from the local marketplace | met | Install section above |
+| omniclaude:luna-researcher and omniclaude:terra-implementer callable in a new desktop session | partial | both listed by the Agent tool; luna-researcher and terra-explorer were invoked (table above); terra-implementer was listed but not invoked |
+| /tasks and transcript show requested model and effort | partial | model verified from both worker transcripts; effort not observed; /tasks row not obtained |
+| omitClaudeMd honored | met | the project CLAUDE.md at C:\CC contains the marker "RuFlo"; the parent transcript contains it 7 times; all 16 non-OmniClaude subagent transcripts in the same session contain it; the two OmniClaude worker transcripts (agent-a319e24c65d163482.jsonl, agent-a20e3c990b13c2ef8.jsonl) contain it 0 times and contain "Behavioral Rules (Always Enforced)" 0 times (checked with grep -c on 2026-10-13) |
+| Routing skill triggers on a substantial task | not tested | the eval suite (Task 9) measures delegation; the two dispatches above were explicit |
+
 ## Measured results
 
 Pending: the with/without-plugin eval (Task 9) runs after the standalone engine is authenticated. No savings claim is made.

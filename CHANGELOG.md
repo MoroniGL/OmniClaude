@@ -9,4 +9,5 @@
 - `routing` skill with on-demand routing and efficiency references.
 - CLI profile files for `claude --settings` (economy, balanced, quality, max).
 - Offline asset tests, CI, and a `claude plugin eval` suite with a no-plugin baseline.
-- No hooks, no settings changes, no savings claims.
+- `docs/local-validation.md` records the local install and live delegation evidence.
+- No hooks, no settings written by the plugin itself (installing records it in settings, as any plugin does), no savings claims.

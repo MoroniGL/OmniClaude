@@ -7,7 +7,7 @@ These are workflow rules, not tool implementations or permission enforcement.
 - Search before reading. Use Grep and Glob, file metadata, and `git diff --stat` before opening bodies.
 - Give expensive workers summaries plus the critical files, not the whole repository.
 - Reuse earlier findings instead of re-reading.
-- Keep Haiku handoffs lean. Haiku 5.5 bills a request at five times the rate once its prompt passes 100K tokens, cache reads included.
+- Keep Haiku handoffs lean. Haiku 5.5 bills a request at five times the rate once its prompt passes 100K tokens, cache reads included (per Anthropic's pricing page; the exact threshold and multiplier may change).
 
 ## Compact handoff
 

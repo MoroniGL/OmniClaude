@@ -42,6 +42,6 @@ Return to cheaper workers once the hard phase ends.
 
 A worker's summary is a locator, not proof. Open the cited evidence for anything consequential, run or inspect the relevant validation, and own the final answer.
 
-Report routing honestly. The tier you requested is not proof of the model that served it, and `/tasks` shows what actually ran. Never claim a model switch you did not observe.
+Report routing honestly. The tier you requested is not proof of the model that served it; check `/tasks` or the subagent transcript. Never claim a model switch you did not observe.
 
 For profiles and the escalation ladder, read [routing details](references/routing.md). For compact handoffs and context budgets, read [efficiency](references/efficiency.md).

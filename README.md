@@ -7,7 +7,7 @@ The Claude Code edition of [OmniCodex](https://github.com/MoroniGL/Omnicodex).
 
 Unofficial; not affiliated with Anthropic.
 
-**v0.1.0-alpha.1 — Stage 1 (core), experimental.** It ships seven tiered workers and a routing skill as a native Claude Code plugin. It installs no hooks and makes no settings changes. This is not a savings guarantee: see [measured results](docs/local-validation.md).
+**v0.1.0-alpha.1 — Stage 1 (core), experimental.** It ships seven tiered workers and a routing skill as a native Claude Code plugin. OmniClaude itself installs no hooks and writes no settings; installing it records the plugin in your `~/.claude/settings.json`, as any plugin install does. This is not a savings guarantee: see [measured results](docs/local-validation.md).
 
 ## What it does
 
@@ -52,9 +52,9 @@ Run `/reload-plugins` or start a new session afterwards.
 
 ## Use
 
-Work as usual. On substantial tasks, Claude loads the routing skill and delegates. You can also ask for a worker directly, for example *"use omniclaude:terra-explorer to map the checkout flow"* or `@agent-omniclaude:sol-reviewer`.
+Work as usual. On substantial tasks the routing skill asks Claude to delegate bounded phases; whether it does is Claude's choice (see Honest limits). You can also ask for a worker directly, for example *"use omniclaude:terra-explorer to map the checkout flow"* or `@agent-omniclaude:sol-reviewer`.
 
-`/tasks` shows the model and effort each subagent actually ran with.
+`/tasks` names the model on each subagent's row and the effort level set for it.
 
 ## Profiles
 
@@ -66,6 +66,8 @@ A profile sets the parent model and effort. Worker tiers are the same in every p
 | `omni:balanced` | Opus | medium | Sonnet |
 | `omni:quality` | Opus | high | inherit |
 | `omni:max` | Fable | high | Opus |
+
+The 'Unassigned subagents' column relies on `env.CLAUDE_CODE_SUBAGENT_MODEL` in the profile file, which is not yet verified live (see anthropics/claude-code#43869).
 
 **CLI:** copy a profile file from `plugins/omniclaude/profiles/` to a stable location, then run:
 
@@ -80,29 +82,35 @@ claude --settings ~/omniclaude-profiles/balanced.settings.json
 ## Honest limits
 
 - **Tiers are requested, not enforced.** Claude can pass its own model or effort on an Agent call.
-- **Delegation is Claude's choice.** It depends on Claude choosing to delegate, and the delegation rate is measured, not assumed.
+- **'Read-only' and 'no edits' are instructions, not tool restrictions,** for terra-explorer, sol-planner and sol-reviewer, which keep Bash. Only luna-researcher has no shell at all.
+- **Delegation is Claude's choice.** It depends on Claude choosing to delegate, and the delegation rate will be measured by the eval suite (pending).
 - **Multi-model setups can cost more** than one model at lower effort. OmniClaude claims savings only from a measured eval.
 - **Other providers degrade the tiers.** On Bedrock, Vertex and Foundry the aliases map to older models, some without effort support.
-- **Fable bills usage credits** on Pro and Team Standard seats. `astra-expert` never runs without your explicit agreement.
+- **Fable may bill usage credits** on some plans (Anthropic's support article on Fable access describes Pro and Team Standard seats; check your plan). `astra-expert` never runs without your explicit agreement.
 
 ## Differences from OmniCodex
 
 - Same worker names and roles.
 - luna runs at medium effort, because Haiku 5.5 stops early at low.
-- astra starts at low effort and re-runs at high on failure, following Anthropic's "next tier at low effort" guidance.
+- astra starts at low effort and re-runs at high on failure (again with your agreement), following Anthropic's "next tier at low effort" guidance.
 - astra-expert always asks for your agreement first, even after a sol worker fails.
 - No in-session `omni …` control yet; that is Stage 2.
 - No Gemini context offload yet; that is phase 2.
 
 ## Sources
 
-The runtime behavior described here (subagent model precedence, effort levels, pricing, Haiku 5.5 behavior) comes from the official docs, checked on 2026-10-13:
+The runtime behavior described here (subagent model precedence, effort levels, pricing, Haiku 5.5 behavior, desktop limits) comes from the official docs, checked on 2026-10-13. Statements not covered by these pages are marked unverified in the text:
 
 - https://code.claude.com/docs/en/sub-agents
 - https://code.claude.com/docs/en/model-config
 - https://code.claude.com/docs/en/settings-reference
 - https://code.claude.com/docs/en/plugins/components
 - https://code.claude.com/docs/en/costs
+- https://code.claude.com/docs/en/desktop
+- https://code.claude.com/docs/en/prompt-caching
+- https://code.claude.com/docs/en/discover-plugins
+- https://platform.claude.com/docs/en/about-claude/pricing
+- https://platform.claude.com/docs/en/models/overview
 
 ## Development
 

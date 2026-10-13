@@ -8,7 +8,7 @@ Configured models are requests, not proof of what served the work:
 
 - A worker's frontmatter `model` and `effort` apply unless the Agent call passes its own `model` or `effort`, which outranks frontmatter.
 - `CLAUDE_CODE_SUBAGENT_MODEL` only sets the default for subagents without a `model` field, such as general-purpose. It does not change built-in Explore or Plan.
-- `/tasks` shows the model and effort each subagent actually ran with. Subagent transcripts record the served model.
+- `/tasks` names the model on each subagent's row and the effort level set for it. Subagent transcripts record the served model.
 
 Distinguish requested configuration, local execution records, and provider responses. Missing evidence means unverified.
 
@@ -53,7 +53,7 @@ A profile sets the parent model and effort. Worker tiers stay the same in every 
 
     same worker, higher effort  ->  next tier at low effort  ->  astra-expert (last, with consent)
 
-Measured guidance from Anthropic: for checkable work, running at low effort and re-running failures at high kept the pass rate at about half the cost. Moving up a model tier should start at low effort.
+Anthropic's cost guidance reports that, for checkable work, running at low effort and re-running failures at high kept the pass rate at roughly half the cost, and that moving up a model tier should start at low effort. These figures are Anthropic's, not OmniClaude measurements, and were not independently verified.
 
 ## Route transparency
 

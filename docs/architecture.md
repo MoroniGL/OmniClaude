@@ -3,7 +3,7 @@
 OmniClaude separates **policy**, **control plane**, **execution plane**, and **runtime evidence**.
 
 ## Policy
-The `routing` skill decides: is this work substantial, which bounded phases exist, which is the cheapest capable worker, and is escalation justified. The skill is also what authorizes delegation, since Claude Code's built-in prompt discourages delegation unless a `CLAUDE.md` file or a skill asks for it.
+The `routing` skill decides: is this work substantial, which bounded phases exist, which is the cheapest capable worker, and is escalation justified. The skill is also what authorizes delegation, since Claude Code's built-in prompt can discourage delegation unless a `CLAUDE.md` file or a skill asks for it (observed in the 2.1.295 binary's prompt text; not a documented contract).
 
 ## Control plane
 The parent conversation owns decomposition, delegation, dependency tracking, acceptance, and escalation. A profile sets the parent's model and effort.

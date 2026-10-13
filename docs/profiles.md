@@ -1,6 +1,6 @@
 # Profiles
 
-A profile sets the **parent** model and effort, plus the default model for subagents that have no `model` of their own (general-purpose, teammates, workflow agents). OmniClaude's workers keep their own tiers in every profile.
+A profile sets the **parent** model and effort, plus the default model for subagents that have no `model` of their own (general-purpose, teammates, workflow agents). Delivery of that default through a settings `env` block is not yet verified live (anthropics/claude-code#43869 reports it being ignored); the eval in docs/local-validation.md will record what happens. OmniClaude's workers keep their own tiers in every profile.
 
 | Profile | Parent | Effort | Unassigned subagents | When |
 |---|---|---|---|---|

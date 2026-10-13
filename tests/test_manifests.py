@@ -37,8 +37,11 @@ class ManifestTests(unittest.TestCase):
         self.assertTrue(plugin["homepage"].startswith("https://"))
 
     def test_names_avoid_reserved_prefixes(self) -> None:
-        for name in ("omniclaude", "moronigl"):
-            self.assertFalse(name.startswith(("claude-", "anthropic-")))
+        market = load(ROOT / ".claude-plugin" / "marketplace.json")
+        plugin = load(PLUGIN / ".claude-plugin" / "plugin.json")
+        for name in (market["name"], plugin["name"], *(p["name"] for p in market["plugins"])):
+            with self.subTest(name=name):
+                self.assertFalse(name.startswith(("claude-", "anthropic-")))
 
     def test_plugin_ships_no_settings_or_bin(self) -> None:
         self.assertFalse((PLUGIN / "settings.json").exists())

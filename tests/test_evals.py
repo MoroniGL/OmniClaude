@@ -35,6 +35,9 @@ class EvalTests(unittest.TestCase):
                 self.assertGreaterEqual(len(graders), 2)
                 for grader in graders:
                     self.assertIn(parse(grader)[0]["type"], GRADER_TYPES)
+                no_astra = EVALS / case / "graders" / "no-astra.md"
+                self.assertTrue(no_astra.is_file(), "every case must forbid astra-expert")
+                self.assertEqual(parse(no_astra)[0]["type"], "tool_used")
 
     def test_frontmatter_scalars_are_yaml_safe(self) -> None:
         # Claude Code parses this frontmatter as real YAML. An unquoted scalar that ends with ":"

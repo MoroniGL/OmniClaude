@@ -1,0 +1,14 @@
+{
+  "name": "moronigl",
+  "description": "Cost-aware model routing and multi-agent orchestration for Claude Code: tiered workers and a routing skill. The Claude Code edition of OmniCodex. Unofficial; not affiliated with Anthropic.",
+  "owner": {
+    "name": "Moroni Gomes Leal"
+  },
+  "plugins": [
+    {
+      "name": "omniclaude",
+      "source": "./plugins/omniclaude",
+      "description": "Cost-aware model routing and multi-agent orchestration for Claude Code: tiered workers and a routing skill. The Claude Code edition of OmniCodex. Unofficial; not affiliated with Anthropic."
+    }
+  ]
+}

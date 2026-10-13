@@ -1,0 +1,12 @@
+{
+  "name": "omniclaude",
+  "version": "0.1.0-alpha.1",
+  "description": "Cost-aware model routing and multi-agent orchestration for Claude Code: tiered workers and a routing skill. The Claude Code edition of OmniCodex. Unofficial; not affiliated with Anthropic.",
+  "author": {
+    "name": "Moroni Gomes Leal"
+  },
+  "homepage": "https://github.com/MoroniGL/Omniclaude",
+  "repository": "https://github.com/MoroniGL/Omniclaude",
+  "license": "MIT",
+  "keywords": ["routing", "cost", "subagents", "orchestration", "omnicodex"]
+}

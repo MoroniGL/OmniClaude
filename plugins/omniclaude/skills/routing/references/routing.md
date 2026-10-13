@@ -31,7 +31,7 @@ Distinguish requested configuration, local execution records, and provider respo
 | sol-planner | opus | medium | no file edits |
 | sol-reviewer | opus | medium | no file edits; request high per call for high-stakes reviews |
 | sol-debugger | opus | high | difficult debugging |
-| astra-expert | fable | low | exceptional only; re-run at high on failure; may bill usage credits |
+| astra-expert | fable | low | exceptional only; ask the user before dispatching, even after a sol failure; re-run at high on failure; may bill usage credits |
 
 These are the shipped targets. Do not rewrite them because a newer model exists. Compare representative tasks with `claude plugin eval` first.
 

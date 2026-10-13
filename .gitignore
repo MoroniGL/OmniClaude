@@ -1,0 +1,10 @@
+.DS_Store
+.env
+.env.*
+!.env.example
+__pycache__/
+*.py[cod]
+*.log
+.tmp/
+plugins/omniclaude/evals/results/
+.superpowers/

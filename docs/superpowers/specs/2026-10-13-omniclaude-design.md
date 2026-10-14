@@ -253,7 +253,7 @@ The stage 2 outline below gets re-planned with stage 1 evidence:
 ## 12. Open risks
 
 - Routing value is unproven until the stage 1 eval runs.
-- The parent may not delegate. Delegation rate is measured, not assumed; the Stage 1 eval measured 0 of 12 runs.
+- The parent may not delegate. Delegation rate is measured, not assumed; the Stage 1 eval observed no delegation in 8 counted with-plugin runs (6 uncounted).
 - Issue anthropics/claude-code#43869 reports `CLAUDE_CODE_SUBAGENT_MODEL` from settings
   `env` being ignored. It is verified live before stage 2 relies on it.
 - Off the Anthropic API, aliases degrade: on Bedrock and Vertex, `sonnet` maps to 4.5

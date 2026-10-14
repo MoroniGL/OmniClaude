@@ -79,7 +79,7 @@ Two bounded tasks were dispatched from the parent, a Fable 5.1 session:
 
 - The `claude plugin eval` smoke run (Task 7) ended with "Not logged in · Please run /login", exit 2, $0.00. The standalone engine has no credentials; the desktop app's session is separate.
 - Because of this, the headless `-p` delegation test did not run.
-- The user chose to log the engine in (`claude.exe auth login`). That step was pending at the time of writing.
+- The user chose to log the engine in (`claude.exe auth login`). On 2026-10-14 the user logged the standalone engine in (`claude.exe auth status` → `loggedIn: true`, `authMethod: claude.ai`); the eval below ran with that login.
 
 ## Acceptance status (spec §8.3)
 
@@ -89,7 +89,7 @@ Two bounded tasks were dispatched from the parent, a Fable 5.1 session:
 | omniclaude:luna-researcher and omniclaude:terra-implementer callable in a new desktop session | partial | both listed by the Agent tool; luna-researcher and terra-explorer were invoked (table above); terra-implementer was listed but not invoked |
 | /tasks and transcript show requested model and effort | partial | model verified from both worker transcripts; effort not observed; /tasks row not obtained |
 | omitClaudeMd honored | met | the project CLAUDE.md at C:\CC contains the marker "RuFlo"; the parent transcript contains it 7 times; all 16 non-OmniClaude subagent transcripts in the same session contain it; the two OmniClaude worker transcripts (agent-a319e24c65d163482.jsonl, agent-a20e3c990b13c2ef8.jsonl) contain it 0 times and contain "Behavioral Rules (Always Enforced)" 0 times (checked with grep -c on 2026-10-13) |
-| Routing skill triggers on a substantial task | not met in the eval | 0 Skill-tool calls and 0 Agent-tool calls across 12 WITH runs plus 2 diagnostic runs (see Measured results) |
+| Routing skill triggers on a substantial task | not met in the traced runs | 0 Skill-tool calls in the 2 traced diagnostic runs (scout-call-sites, docs-lookup); Skill use was not counted in the 12 suite runs (see Measured results) |
 
 ## Measured results
 
@@ -105,8 +105,8 @@ Scores are the mean per case (1.00 means every grader passed in every run). Cost
 
 | Case | WITH score | W/OUT score | Δ | WITH cost | W/OUT cost | Delegated (with-arm) | Models served (with-arm) |
 |---|---|---|---|---|---|---|---|
-| docs-lookup | 1.00 | 1.00 | 0.00 | 0.1058 | 0.0638 | 0 of 3 runs | claude-opus-5-5 only (parent); no worker dispatched |
-| implement-discount | 1.00 | 1.00 | 0.00 | 0.1058 | 0.1024 | 0 of 3 runs | claude-opus-5-5 only (parent); no worker dispatched |
+| docs-lookup | 1.00 | 1.00 | 0.00 | 0.1058 | 0.0638 | not counted (only `no-astra`: 0 `astra-expert` dispatches in 3 runs) | claude-opus-5-5 (parent); worker dispatch not counted |
+| implement-discount | 1.00 | 1.00 | 0.00 | 0.1058 | 0.1024 | not counted (only `no-astra`: 0 `astra-expert` dispatches in 3 runs) | claude-opus-5-5 (parent); worker dispatch not counted |
 | scout-call-sites | 1.00 | 1.00 | 0.00 | 0.1043 | 0.1007 | 0 of 3 runs | claude-opus-5-5 only (parent); no worker dispatched |
 | tiny-edit | 1.00 | 1.00 | 0.00 | 0.0652 | 0.0569 | 0 of 3 runs | claude-opus-5-5 only (parent); no worker dispatched |
 
@@ -114,7 +114,7 @@ How delegation was counted:
 - scout-call-sites: the `delegated` grader (Agent calls whose input matches `omniclaude:`, WITH arm only) failed in all 3 WITH runs with "Agent called 0x (expected 1..∞)". The parent never dispatched an OmniClaude worker.
 - tiny-edit: the `no-delegation` grader (any Agent call, both arms) passed in all 6 runs, so there was no over-delegation on the tiny task.
 - every case: the `no-astra` grader (Agent calls matching `astra-expert`, both arms) passed in all 24 runs.
-- docs-lookup and implement-discount have no grader that counts Agent calls other than `astra-expert`, and the per-run traces of the full suite were temporary files that are no longer on disk. For those two cases the 0 of 3 was not asserted by a grader; the only direct Agent-call count there is the single docs-lookup diagnostic run below.
+- docs-lookup and implement-discount have no grader that counts Agent calls other than `astra-expert`, and the per-run traces of the full suite were temporary files that are no longer on disk. For those two cases general Agent use in the suite runs is unobserved; the only direct Agent-call count for docs-lookup is the single diagnostic run below.
 
 ### Diagnostic: did the routing skill fire?
 
@@ -129,8 +129,8 @@ The `routing` skill never fired on these prompts and the parent never delegated.
 
 - Cost did not go down on any task shape. Mean cost per run with the plugin was higher on all four cases: docs-lookup +66%, tiny-edit +15%, scout-call-sites +4%, implement-discount +3%. The +66% case is noisy: its three WITH runs cost 0.1273 / 0.1218 / 0.0683 against 0.0658 / 0.0662 / 0.0592 W/OUT. These are per-case results of this one suite, not a general cost figure.
 - Quality held. Every case scored 1.00 in both arms, every grader passed in all 24 runs, and Δ = 0.00 everywhere. The plugin neither helped nor hurt correctness on these tasks.
-- Delegation rate: 0 of 12 WITH runs delegated (see "How delegation was counted" for what each figure rests on).
-- The plugin's only runtime effect in this suite was its always-on context (~636 tokens per session, from `plugin details`), a fixed overhead. Because the parent never delegated, no cheaper-tier execution happened to offset it.
+- Delegation: 0 Agent-tool calls in the 8 with-plugin runs where it was counted (scout-call-sites ×3 via `delegated`, tiny-edit ×3 via `no-delegation`, plus the 2 traced diagnostic runs); the 6 docs-lookup and implement-discount suite runs had only the `no-astra` counter, so general Agent use there is unobserved.
+- The plugin's only runtime effect in this suite was its always-on context (~636 tokens per session, from `plugin details`), a fixed overhead. Because no delegation was observed in the counted runs, no cheaper-tier execution was seen to offset it.
 
 Caveats:
 - Costs are list-price estimates, not billed amounts.

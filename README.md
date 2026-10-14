@@ -7,7 +7,7 @@ The Claude Code edition of [OmniCodex](https://github.com/MoroniGL/Omnicodex).
 
 Unofficial; not affiliated with Anthropic.
 
-**v0.1.0-alpha.1 — Stage 1 (core), experimental.** It ships seven tiered workers and a routing skill as a native Claude Code plugin. OmniClaude itself installs no hooks and writes no settings; installing it records the plugin in your `~/.claude/settings.json`, as any plugin install does. This is not a savings guarantee. A small local eval (4 synthetic tasks, Opus 5.5 parent) found identical quality with and without the plugin, equal or higher cost with it, and zero delegations: the routing skill did not fire on those tasks; see [measured results](docs/local-validation.md).
+**v0.1.0-alpha.1 — Stage 1 (core), experimental.** It ships seven tiered workers and a routing skill as a native Claude Code plugin. OmniClaude itself installs no hooks and writes no settings; installing it records the plugin in your `~/.claude/settings.json`, as any plugin install does. This is not a savings guarantee. A small local eval (4 synthetic tasks, Opus 5.5 parent) found identical quality with and without the plugin, equal or higher cost with it, and no delegation in any run where Agent-tool use was counted (8 of 14 with-plugin runs; the other 6 had no general Agent counter): the routing skill did not fire on those tasks; see [measured results](docs/local-validation.md).
 
 ## What it does
 
@@ -83,7 +83,7 @@ claude --settings ~/omniclaude-profiles/balanced.settings.json
 
 - **Tiers are requested, not enforced.** Claude can pass its own model or effort on an Agent call.
 - **'Read-only' and 'no edits' are instructions, not tool restrictions,** for terra-explorer, sol-planner and sol-reviewer, which keep Bash. Only luna-researcher has no shell at all.
-- **Delegation is Claude's choice.** It depends on Claude choosing to delegate, and in the Stage 1 eval the delegation rate was 0 of 12 runs (see measured results).
+- **Delegation is Claude's choice.** It depends on Claude choosing to delegate, and in the Stage 1 eval no delegation occurred in the 8 with-plugin runs where Agent-tool use was counted (6 runs had no counter); see measured results.
 - **Multi-model setups can cost more** than one model at lower effort. OmniClaude claims savings only from a measured eval.
 - **Other providers degrade the tiers.** On Bedrock, Vertex and Foundry the aliases map to older models, some without effort support.
 - **Fable may bill usage credits** on some plans (Anthropic's support article on Fable access describes Pro and Team Standard seats; check your plan). `astra-expert` never runs without your explicit agreement.

@@ -1,7 +1,7 @@
 import type { Register, EngineInterface } from 'claude-code'
 import type { LastStep, Profile, Applied, Verified } from '../types'
 import { PROFILES, spawnModel, tierOf } from './policy'
-import type { FixedProfile } from './policy'
+import type { Effort, FixedProfile, Tier } from './policy'
 
 // Each state ref is its own const: the validator reads literal { plugin, key } refs, not object members.
 const LAST_STEP = { plugin: 'omniclaude', key: 'lastStep' } as const
@@ -21,7 +21,7 @@ function isProfile(x: unknown): x is Profile {
 
 export async function resolveProfile($: EngineInterface, optionProfile: unknown): Promise<Profile> {
   const { value: override } = await $.state.get(PROFILE_OVERRIDE)
-  if (override) return override
+  if (isProfile(override)) return override
   const saved = await $.store.get('profile')
   if (isProfile(saved)) return saved
   return isProfile(optionProfile) ? optionProfile : 'auto'
@@ -33,7 +33,7 @@ export function spawnProfile(profile: Profile): FixedProfile {
 }
 
 /** What the main loop should run on: the profile's parent, or auto's plan (balanced until classified). */
-export async function parentTarget($: EngineInterface, profile: Profile): Promise<{ model: string; effort: string }> {
+export async function parentTarget($: EngineInterface, profile: Profile): Promise<{ model: Tier; effort: Effort }> {
   if (profile !== 'auto') return PROFILES[profile].parent
   const { value: plan } = await $.state.get(PLAN)
   return plan ? { model: plan.model, effort: plan.effort } : PROFILES.balanced.parent
@@ -70,34 +70,45 @@ export const register: Register = (on, options) => {
     if (e.agentId !== undefined) return yield* next(e)
     const profile = await resolveProfile($, optionProfile)
     const target = await parentTarget($, profile)
-    const applied: Applied = { model: target.model, effort: target.effort }
+    // A 1M-context session keeps its window: `opus[1m]` / `sonnet[1m]` exist; haiku and fable have no such alias.
+    const keepsWindow = e.model.trim().toLowerCase().endsWith('[1m]') && (target.model === 'opus' || target.model === 'sonnet')
+    const sendModel = keepsWindow ? `${target.model}[1m]` : target.model
+    const applied: Applied = { model: sendModel, effort: target.effort }
     const seen: LastStep = e.effort === undefined ? { model: e.model } : { model: e.model, effort: e.effort }
     await $.state.set(LAST_STEP, seen)
     await $.state.set(APPLIED, applied)
-    $.ui.status(`omni:${profile} · ${target.model}/${target.effort}`)
-    return yield* next({ ...e, model: target.model, effort: target.effort as 'low' | 'medium' | 'high' })
+    $.ui.status(`omni:${profile} · ${sendModel}/${target.effort}`)
+    return yield* next({ ...e, model: sendModel, effort: target.effort })
   })
 
   on('agent.spawn', async ($, e, next) => {
-    if (e.fork || e.isTeammate || e.workflow) return next(e)
-    const profile = await resolveProfile($, optionProfile)
+    // The consent gate comes first: a teammate or workflow agent of this type must not slip past it (a fork's type is `fork`).
     if (e.subagentType === ASTRA) {
+      const profile = await resolveProfile($, optionProfile)
       const { value: consent } = await $.state.get(ASTRA_CONSENT)
       if (!consent && profile !== 'max') return { deny: ASTRA_DENY }
     }
+    if (e.fork || e.isTeammate || e.workflow) return next(e)
+    const profile = await resolveProfile($, optionProfile)
     // `agentModel` is undefined: the engine does not expose an agent's own frontmatter model.
     const model = spawnModel(spawnProfile(profile), e.subagentType, undefined, e.model)
     return model === undefined ? next(e) : next({ ...e, model })
   }).catch(($, e, next) => (next.called ? next(e) : { deny: 'omniclaude: its spawn guard failed; refusing to be safe' }))
 
   on('turn.complete', async ($, e, next) => {
-    if (e.agentId === undefined && e.usage?.model) {
-      const verified: Verified = { model: e.usage.model }
-      await $.state.set(VERIFIED, verified)
-      const { value: applied } = await $.state.get(APPLIED)
-      const ok = applied && tierOf(applied.model) === tierOf(e.usage.model)
-      const profile = await resolveProfile($, optionProfile)
-      $.ui.status(`omni:${profile} · ${applied?.model ?? '?'}/${String(applied?.effort ?? '?')} ${ok ? '✓' : '≠ ' + e.usage.model}`)
+    if (e.agentId === undefined) {
+      const usedModel = e.usage?.model
+      if (!usedModel) {
+        // A main-loop turn with no usage (aborted, API error) verified nothing: never leave the previous turn's model standing.
+        await $.state.set(VERIFIED, null)
+      } else {
+        const verified: Verified = { model: usedModel }
+        await $.state.set(VERIFIED, verified)
+        const { value: applied } = await $.state.get(APPLIED)
+        const ok = applied && tierOf(applied.model) === tierOf(usedModel)
+        const profile = await resolveProfile($, optionProfile)
+        $.ui.status(`omni:${profile} · ${applied?.model ?? '?'}/${String(applied?.effort ?? '?')} ${ok ? '✓' : '≠ ' + usedModel}`)
+      }
     }
     return next(e)
   })

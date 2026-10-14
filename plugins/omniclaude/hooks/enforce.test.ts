@@ -133,3 +133,99 @@ test('turn.complete flags a mismatch and ignores subagent turns', async ($, on) 
   expect(await status($)).toContain('verified: claude-sonnet-5-5')
   expect(statuses[statuses.length - 1]).toContain('≠ claude-sonnet-5-5')
 })
+
+const ASTRA_DENY = 'astra-expert needs your agreement: run /omni astra allow'
+
+test('astra-expert spawned as a teammate is still denied without consent', async ($, on) => {
+  const spawned: any[] = []
+  on('agent.spawn', async (_$, e) => { spawned.push(e); return { model: e.model ?? 'inherit', agentId: 'a1' } })
+  await ready($, on, 'quality')
+  const denied: any = await $.agent.spawn({ ...SPAWN('omniclaude:astra-expert'), isTeammate: true } as any)
+  expect(denied.deny).toBe(ASTRA_DENY)
+  expect(spawned.length).toBe(0)
+})
+
+test('astra-expert started by a workflow script is still denied without consent', async ($, on) => {
+  const spawned: any[] = []
+  on('agent.spawn', async (_$, e) => { spawned.push(e); return { model: e.model ?? 'inherit', agentId: 'a1' } })
+  await ready($, on, 'quality')
+  const denied: any = await $.agent.spawn({ ...SPAWN('omniclaude:astra-expert'), workflow: { runId: 'wf_1', agentIndex: 1 } } as any)
+  expect(denied.deny).toBe(ASTRA_DENY)
+  expect(spawned.length).toBe(0)
+})
+
+test('a fork is passed through untouched', async ($, on) => {
+  const spawned: any[] = []
+  on('agent.spawn', async (_$, e) => { spawned.push(e); return { model: e.model ?? 'inherit', agentId: 'a1' } })
+  await ready($, on, 'economy')
+  await $.agent.spawn({ ...SPAWN('fork'), fork: true } as any)
+  expect(spawned.length).toBe(1)
+  expect(spawned[0].model).toBeUndefined()
+})
+
+test('a teammate is passed through untouched', async ($, on) => {
+  const spawned: any[] = []
+  on('agent.spawn', async (_$, e) => { spawned.push(e); return { model: e.model ?? 'inherit', agentId: 'a1' } })
+  await ready($, on, 'economy')
+  await $.agent.spawn({ ...SPAWN('general-purpose'), isTeammate: true } as any)
+  expect(spawned.length).toBe(1)
+  expect(spawned[0].model).toBeUndefined()
+})
+
+test('the spawn guard denies when the hook itself fails', async ($, on) => {
+  const spawned: any[] = []
+  on('agent.spawn', async (_$, e) => { spawned.push(e); return { model: e.model ?? 'inherit', agentId: 'a1' } })
+  // No mock.store and no session: $.store.get has no implementation, so resolveProfile throws inside the hook.
+  const denied: any = await $.agent.spawn(SPAWN('general-purpose'))
+  expect(denied.deny).toBe('omniclaude: its spawn guard failed; refusing to be safe')
+  expect(spawned.length).toBe(0)
+})
+
+test('auto with no plan pins the main loop to opus/medium', async ($, on) => {
+  let sent: any = null
+  on('turn.step', async function* (_$, e) { sent = e; return STEP_RESULT(e) })
+  await ready($, on, 'auto')
+  await drain($.turn.step(STEP('claude-sonnet-5-5', 'low')))
+  expect(sent.model).toBe('opus')
+  expect(sent.effort).toBe('medium')
+  expect(await status($)).toContain('Profile: auto')
+})
+
+test('a main-loop completion without usage clears the verified model', async ($, on) => {
+  on('turn.complete', async (_$, e) => ({ text: e.answer }))
+  await ready($, on, 'balanced')
+  await $.turn.complete({
+    turnId: 't1', reason: 'answer', answer: 'ok', durationMs: 10, isAborted: false,
+    usage: { model: 'claude-opus-5-5' } as any,
+  })
+  expect(await status($)).toContain('verified: claude-opus-5-5')
+  await $.turn.complete({ turnId: 't2', reason: 'error', answer: '', durationMs: 10, isAborted: false })
+  expect(await status($)).toContain('verified: none')
+})
+
+test('a 1M-context main loop keeps its [1m] window on opus and sonnet', async ($, on) => {
+  const seen: any[] = []
+  on('turn.step', async function* (_$, e) { seen.push(e); return STEP_RESULT(e) })
+  await ready($, on, 'balanced')
+  await drain($.turn.step(STEP('claude-opus-5-5[1m]', 'high')))
+  expect(seen[0].model).toBe('opus[1m]')
+  expect(seen[0].effort).toBe('medium')
+  expect(await status($)).toContain('applied: opus[1m]/medium')
+})
+
+test('a 1M-context main loop under economy gets sonnet[1m]', async ($, on) => {
+  const seen: any[] = []
+  on('turn.step', async function* (_$, e) { seen.push(e); return STEP_RESULT(e) })
+  await ready($, on, 'economy')
+  await drain($.turn.step(STEP('claude-opus-5-5[1m]', 'high')))
+  expect(seen[0].model).toBe('sonnet[1m]')
+})
+
+test('fable has no [1m] alias: max sends the bare alias even from a 1M session', async ($, on) => {
+  const seen: any[] = []
+  on('turn.step', async function* (_$, e) { seen.push(e); return STEP_RESULT(e) })
+  await ready($, on, 'max')
+  await drain($.turn.step(STEP('claude-opus-5-5[1m]', 'high')))
+  expect(seen[0].model).toBe('fable')
+  expect(seen[0].effort).toBe('high')
+})

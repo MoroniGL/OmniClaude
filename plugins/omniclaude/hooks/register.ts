@@ -2,8 +2,10 @@ import type { Register, EngineInterface } from 'claude-code'
 import type { LastStep, Profile, Applied, Verified } from '../types'
 import { PROFILES, spawnModel, tierOf } from './policy'
 import type { Effort, FixedProfile, Tier } from './policy'
+import { HELP, MAX_WARNING, doctorText, formatStatus, isProfile, parseOmni } from './omni'
+import type { OmniCommand } from './omni'
 
-// Each state ref is its own const: the validator reads literal { plugin, key } refs, not object members.
+// Each state ref is its own const: the validator reads literal { plugin, key } refs from the file that uses them, not object members or imports.
 const LAST_STEP = { plugin: 'omniclaude', key: 'lastStep' } as const
 const PROFILE_OVERRIDE = { plugin: 'omniclaude', key: 'profileOverride' } as const
 const PLAN = { plugin: 'omniclaude', key: 'plan' } as const
@@ -13,12 +15,9 @@ const VERIFIED = { plugin: 'omniclaude', key: 'verified' } as const
 
 const ASTRA = 'omniclaude:astra-expert'
 const ASTRA_DENY = 'astra-expert needs your agreement: run /omni astra allow'
-const PROFILE_NAMES: readonly Profile[] = ['auto', 'economy', 'balanced', 'quality', 'max']
+const MAX_STATUS = 'omni:max · Fable parent; astra-expert allowed — may bill usage credits'
 
-function isProfile(x: unknown): x is Profile {
-  return typeof x === 'string' && (PROFILE_NAMES as readonly string[]).includes(x)
-}
-
+/** The session override, else the saved profile, else the config option, else auto. */
 export async function resolveProfile($: EngineInterface, optionProfile: unknown): Promise<Profile> {
   const { value: override } = await $.state.get(PROFILE_OVERRIDE)
   if (isProfile(override)) return override
@@ -39,6 +38,48 @@ export async function parentTarget($: EngineInterface, profile: Profile): Promis
   return plan ? { model: plan.model, effort: plan.effort } : PROFILES.balanced.parent
 }
 
+async function statusText($: EngineInterface, optionProfile: unknown): Promise<string> {
+  const saved = await $.store.get('profile')
+  const { value: override } = await $.state.get(PROFILE_OVERRIDE)
+  const { value: plan } = await $.state.get(PLAN)
+  const { value: last } = await $.state.get(LAST_STEP)
+  const { value: applied } = await $.state.get(APPLIED)
+  const { value: verified } = await $.state.get(VERIFIED)
+  const { value: consent } = await $.state.get(ASTRA_CONSENT)
+  const effective = await resolveProfile($, optionProfile)
+  return formatStatus({ effective, saved, optionProfile, override, plan, last, applied, verified, consent: Boolean(consent) })
+}
+
+export async function runOmni($: EngineInterface, cmd: OmniCommand, ctx: { optionProfile: unknown; version: string }): Promise<string> {
+  switch (cmd.kind) {
+    case 'status':
+      return statusText($, ctx.optionProfile)
+    case 'set': {
+      await $.state.set(PROFILE_OVERRIDE, cmd.profile)
+      let note = ''
+      if (cmd.profile === 'max') {
+        await $.state.set(ASTRA_CONSENT, true)
+        note = MAX_WARNING
+      }
+      return (await statusText($, ctx.optionProfile)) + note
+    }
+    case 'save':
+      await $.store.set('profile', cmd.profile)
+      return (await statusText($, ctx.optionProfile)) + `
+  saved ${cmd.profile} for future sessions.`
+    case 'reset':
+      await $.state.set(PROFILE_OVERRIDE, null)
+      return statusText($, ctx.optionProfile)
+    case 'astra':
+      await $.state.set(ASTRA_CONSENT, cmd.allow)
+      return statusText($, ctx.optionProfile)
+    case 'doctor':
+      return doctorText(ctx.version)
+    case 'help':
+      return HELP
+  }
+}
+
 export const register: Register = (on, options) => {
   const optionProfile = (options as { profile?: unknown } | undefined)?.profile
 
@@ -49,20 +90,16 @@ export const register: Register = (on, options) => {
       argumentHint: 'status | economy | balanced | quality | max | auto | save <profile> | reset | astra allow|deny | doctor',
     })
     const profile = await resolveProfile($, optionProfile)
-    $.ui.status(`omni:${profile}`)
+    $.ui.status(profile === 'max' ? MAX_STATUS : `omni:${profile}`)
     return next(e)
   })
 
-  // Temporary status text until Task 4 replaces it with the real /omni handler.
-  on('command.run', { command: 'omni' }, async $ => {
+  on('command.run', { command: 'omni' }, async ($, e) => {
+    const version = (await $.session.version()).version
+    const text = await runOmni($, parseOmni(e.args), { optionProfile, version })
     const profile = await resolveProfile($, optionProfile)
-    const { value: last } = await $.state.get(LAST_STEP)
-    const { value: applied } = await $.state.get(APPLIED)
-    const { value: verified } = await $.state.get(VERIFIED)
-    const seen = last ? `${last.model}/${String(last.effort ?? 'default')}` : 'none'
-    const set = applied ? `${applied.model}/${String(applied.effort ?? 'default')}` : 'none'
-    const checked = verified ? verified.model : 'none'
-    return { text: `OmniClaude mod loaded. Profile: ${profile}. Last main-loop step: ${seen}. applied: ${set}. verified: ${checked}.` }
+    $.ui.status(`omni:${profile}`)
+    return { text }
   })
 
   on('turn.step', async function* ($, e, next) {

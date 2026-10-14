@@ -30,6 +30,7 @@ async function ready($: any, on: any, profile: string): Promise<string[]> {
   mock.store(on, { profile })
   on('session.start', async (_$: any, e: any) => ({ cwd: e.cwd }))
   on('command.register', async (_$: any, e: any) => ({ value: { command: e.name } }))
+  on('session.version', async () => ({ value: { version: '2.1.295' } }))
   on('ui.status', async (_$: any, e: any) => { statuses.push(String(e.text)); return { value: undefined } })
   await $.session.start({ cwd: 'C:/CC/omniclaude', surface: null, isInteractive: false })
   return statuses
@@ -43,10 +44,10 @@ test('balanced pins the main loop to opus/medium', async ($, on) => {
   expect(sent.model).toBe('opus')
   expect(sent.effort).toBe('medium')
   const text = await status($)
-  expect(text).toContain('Profile: balanced')
-  expect(text).toContain('Last main-loop step: claude-sonnet-5-5/high')
-  expect(text).toContain('applied: opus/medium')
-  expect(text).toContain('verified: none')
+  expect(text).toContain('OmniClaude balanced')
+  expect(text).toContain('engine requested (last step): claude-sonnet-5-5/high')
+  expect(text).toContain('applied (last step): opus/medium')
+  expect(text).toContain('verified (last turn, API-reported): none yet')
 })
 
 test('economy pins the main loop to sonnet/medium and leaves subagent steps alone', async ($, on) => {
@@ -61,8 +62,8 @@ test('economy pins the main loop to sonnet/medium and leaves subagent steps alon
   expect(seen[1].effort).toBe('low')
   // the subagent step neither overwrote the main-loop record nor the applied target
   const text = await status($)
-  expect(text).toContain('Last main-loop step: claude-opus-5-5/high')
-  expect(text).toContain('applied: sonnet/medium')
+  expect(text).toContain('engine requested (last step): claude-opus-5-5/high')
+  expect(text).toContain('applied (last step): sonnet/medium')
 })
 
 test('agent.spawn routes Explore and general-purpose by profile', async ($, on) => {
@@ -106,14 +107,16 @@ test('turn.complete records the verified model and flags a match in the status l
   on('turn.step', async function* (_$, e) { return STEP_RESULT(e) })
   on('turn.complete', async (_$, e) => ({ text: e.answer }))
   const statuses = await ready($, on, 'balanced')
-  expect(await status($)).toContain('verified: none')
+  expect(await status($)).toContain('verified (last turn, API-reported): none yet')
   await drain($.turn.step(STEP('claude-sonnet-5-5', 'high')))
   await $.turn.complete({
     turnId: 't1', reason: 'answer', answer: 'ok', durationMs: 10, isAborted: false,
     usage: { model: 'claude-opus-5-5' } as any,
   })
-  expect(await status($)).toContain('verified: claude-opus-5-5')
-  expect(statuses[statuses.length - 1]).toContain('✓')
+  // read the badge before /omni status: that command redraws it as plain `omni:<profile>`
+  const badge = statuses[statuses.length - 1]
+  expect(await status($)).toContain('verified (last turn, API-reported): claude-opus-5-5')
+  expect(badge).toContain('✓')
 })
 
 test('turn.complete flags a mismatch and ignores subagent turns', async ($, on) => {
@@ -125,13 +128,14 @@ test('turn.complete flags a mismatch and ignores subagent turns', async ($, on) 
     turnId: 't1', agentId: 'agent-1', reason: 'answer', answer: 'sub', durationMs: 10, isAborted: false,
     usage: { model: 'claude-haiku-5-5' } as any,
   })
-  expect(await status($)).toContain('verified: none')
+  expect(await status($)).toContain('verified (last turn, API-reported): none yet')
   await $.turn.complete({
     turnId: 't1', reason: 'answer', answer: 'ok', durationMs: 10, isAborted: false,
     usage: { model: 'claude-sonnet-5-5' } as any,
   })
-  expect(await status($)).toContain('verified: claude-sonnet-5-5')
-  expect(statuses[statuses.length - 1]).toContain('≠ claude-sonnet-5-5')
+  const badge = statuses[statuses.length - 1]
+  expect(await status($)).toContain('verified (last turn, API-reported): claude-sonnet-5-5')
+  expect(badge).toContain('≠ claude-sonnet-5-5')
 })
 
 const ASTRA_DENY = 'astra-expert needs your agreement: run /omni astra allow'
@@ -188,7 +192,7 @@ test('auto with no plan pins the main loop to opus/medium', async ($, on) => {
   await drain($.turn.step(STEP('claude-sonnet-5-5', 'low')))
   expect(sent.model).toBe('opus')
   expect(sent.effort).toBe('medium')
-  expect(await status($)).toContain('Profile: auto')
+  expect(await status($)).toContain('OmniClaude auto')
 })
 
 test('a main-loop completion without usage clears the verified model', async ($, on) => {
@@ -198,9 +202,9 @@ test('a main-loop completion without usage clears the verified model', async ($,
     turnId: 't1', reason: 'answer', answer: 'ok', durationMs: 10, isAborted: false,
     usage: { model: 'claude-opus-5-5' } as any,
   })
-  expect(await status($)).toContain('verified: claude-opus-5-5')
+  expect(await status($)).toContain('verified (last turn, API-reported): claude-opus-5-5')
   await $.turn.complete({ turnId: 't2', reason: 'error', answer: '', durationMs: 10, isAborted: false })
-  expect(await status($)).toContain('verified: none')
+  expect(await status($)).toContain('verified (last turn, API-reported): none yet')
 })
 
 test('a 1M-context main loop keeps its [1m] window on opus and sonnet', async ($, on) => {
@@ -210,7 +214,7 @@ test('a 1M-context main loop keeps its [1m] window on opus and sonnet', async ($
   await drain($.turn.step(STEP('claude-opus-5-5[1m]', 'high')))
   expect(seen[0].model).toBe('opus[1m]')
   expect(seen[0].effort).toBe('medium')
-  expect(await status($)).toContain('applied: opus[1m]/medium')
+  expect(await status($)).toContain('applied (last step): opus[1m]/medium')
 })
 
 test('a 1M-context main loop under economy gets sonnet[1m]', async ($, on) => {

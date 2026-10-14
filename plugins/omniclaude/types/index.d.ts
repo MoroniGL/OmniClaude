@@ -6,6 +6,8 @@ export type LastStep = { model: string; effort?: string | number }
 export type Plan = { model: Tier; effort: Effort; source: 'profile' | 'auto'; reason: string }
 export type Applied = { model: string; effort?: string | number }
 export type Verified = { model: string }
+// `label` is one of the four auto classes, `none` (the classifier named no label) or `error` (its request failed).
+export type LastClass = { label: string; reason: string }
 
 declare module 'claude-code' {
   interface PluginState {
@@ -17,6 +19,7 @@ declare module 'claude-code' {
       astraConsentFromMax: boolean
       applied: Applied | null
       verified: Verified | null
+      lastClass: LastClass | null
     }
   }
 }

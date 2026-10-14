@@ -1,4 +1,4 @@
-import type { Applied, LastStep, Plan, Profile, Verified } from '../types'
+import type { Applied, LastClass, LastStep, Plan, Profile, Verified } from '../types'
 import { PROFILES } from './policy'
 
 // Pure helpers only. The engine's `$` is followed only into functions declared in the same file as the call
@@ -48,6 +48,7 @@ export type StatusView = {
   last: LastStep | null | undefined
   applied: Applied | null | undefined
   verified: Verified | null | undefined
+  lastClass: LastClass | null | undefined
   consent: boolean
 }
 
@@ -60,6 +61,7 @@ export function formatStatus(v: StatusView): string {
     `  saved profile: ${isProfile(v.saved) ? v.saved : 'none'}${isProfile(v.optionProfile) ? ` (config option: ${v.optionProfile})` : ''}`,
     `  session override: ${isProfile(v.override) ? v.override : 'none'}`,
     `  requested parent: ${parent}`,
+    `  auto classifier (last prompt): ${v.lastClass ? `${v.lastClass.label} — ${v.lastClass.reason}` : 'none yet'}`,
     `  engine requested (last step): ${v.last ? `${v.last.model}/${String(v.last.effort ?? 'default')}` : 'none yet'}`,
     `  applied (last step): ${v.applied ? `${v.applied.model}/${String(v.applied.effort ?? 'default')}` : 'none yet'}`,
     `  verified (last turn, API-reported): ${v.verified ? v.verified.model : 'none yet'}`,

@@ -1,6 +1,6 @@
 import type { Register, EngineInterface } from 'claude-code'
-import type { LastStep, Plan, Profile, Applied, Verified } from '../types'
-import { PROFILES, decideAutoModel, planForClass, spawnModel, tierOf } from './policy'
+import type { LastClass, LastStep, Plan, Profile, Applied, Verified } from '../types'
+import { PROFILES, TIER_RANK, decideAutoModel, planForClass, spawnModel, tierOf } from './policy'
 import type { AutoClass, Effort, FixedProfile, Tier } from './policy'
 import { HELP, MAX_WARNING, doctorText, formatStatus, isProfile, parseOmni } from './omni'
 import type { OmniCommand } from './omni'
@@ -13,6 +13,7 @@ const ASTRA_CONSENT = { plugin: 'omniclaude', key: 'astraConsent' } as const
 const ASTRA_CONSENT_FROM_MAX = { plugin: 'omniclaude', key: 'astraConsentFromMax' } as const
 const APPLIED = { plugin: 'omniclaude', key: 'applied' } as const
 const VERIFIED = { plugin: 'omniclaude', key: 'verified' } as const
+const LAST_CLASS = { plugin: 'omniclaude', key: 'lastClass' } as const
 
 const ASTRA = 'omniclaude:astra-expert'
 const ASTRA_DENY = 'astra-expert needs your agreement: run /omni astra allow'
@@ -41,13 +42,17 @@ export async function parentTarget($: EngineInterface, profile: Profile): Promis
 
 const AUTO_LABELS = ['trivial', 'routine', 'complex', 'critical'] as const
 
-/** The class the small model names for a prompt; undefined when it names none of the four labels or the request fails. */
-export async function classifyPrompt($: EngineInterface, text: string): Promise<AutoClass | undefined> {
+function isAutoClass(x: unknown): x is AutoClass {
+  return typeof x === 'string' && (AUTO_LABELS as readonly string[]).includes(x)
+}
+
+/** The class the small model names for a prompt; `none` when it names none of the four labels, `error` when the request fails. */
+export async function classifyPrompt($: EngineInterface, text: string): Promise<AutoClass | 'none' | 'error'> {
   try {
     const label = await $.model.classify(text.slice(0, 4000), AUTO_LABELS)
-    return (AUTO_LABELS as readonly (string | undefined)[]).includes(label) ? (label as AutoClass) : undefined
+    return isAutoClass(label) ? label : 'none'
   } catch {
-    return undefined
+    return 'error'
   }
 }
 
@@ -75,9 +80,10 @@ async function statusText($: EngineInterface, optionProfile: unknown): Promise<s
   const { value: last } = await $.state.get(LAST_STEP)
   const { value: applied } = await $.state.get(APPLIED)
   const { value: verified } = await $.state.get(VERIFIED)
+  const { value: lastClass } = await $.state.get(LAST_CLASS)
   const { value: consent } = await $.state.get(ASTRA_CONSENT)
   const effective = await resolveProfile($, optionProfile)
-  return formatStatus({ effective, saved, optionProfile, override, plan, last, applied, verified, consent: Boolean(consent) })
+  return formatStatus({ effective, saved, optionProfile, override, plan, last, applied, verified, lastClass, consent: Boolean(consent) })
 }
 
 export async function runOmni($: EngineInterface, cmd: OmniCommand, ctx: { optionProfile: unknown; version: string }): Promise<string> {
@@ -146,15 +152,23 @@ export const register: Register = (on, options) => {
     if (e.origin.kind !== 'composer') return next(e)
     if ((await resolveProfile($, optionProfile)) !== 'auto') return next(e)
     const klass = await classifyPrompt($, e.text)
-    if (klass === undefined) {
+    if (klass === 'none' || klass === 'error') {
+      const missed: LastClass = { label: klass, reason: klass === 'none' ? 'classifier gave no label; plan kept' : 'classifier request failed; plan kept' }
+      await $.state.set(LAST_CLASS, missed)
       $.ui.status('omni:auto · classifier gave no label; plan kept')
       return next(e)
     }
     const wish = planForClass(klass)
     const { value: previous } = await $.state.get(PLAN)
-    const decided = decideAutoModel(previous ? previous.model : null, wish.model, await contextTokens($))
-    const plan: Plan = { model: decided.model, effort: wish.effort, source: 'auto', reason: `${klass}: ${decided.reason}` }
+    const { value: applied } = await $.state.get(APPLIED)
+    // The model the engine last ran on is the one whose cache is warm; the plan's only stands in before any step ran.
+    const current = (applied ? tierOf(applied.model) : undefined) ?? previous?.model ?? null
+    const decided = decideAutoModel(current, wish.model, await contextTokens($))
+    // A model held back to keep the cache makes up for it with high effort.
+    const keptForCache = TIER_RANK[wish.model] > TIER_RANK[decided.model]
+    const plan: Plan = { model: decided.model, effort: keptForCache ? 'high' : wish.effort, source: 'auto', reason: `${klass}: ${decided.reason}` }
     await $.state.set(PLAN, plan)
+    await $.state.set(LAST_CLASS, { label: klass, reason: decided.reason })
     $.ui.status(`omni:auto · ${klass} → ${plan.model}/${plan.effort}`)
     return next(e)
   })
@@ -171,7 +185,9 @@ export const register: Register = (on, options) => {
     const seen: LastStep = e.effort === undefined ? { model: e.model } : { model: e.model, effort: e.effort }
     await $.state.set(LAST_STEP, seen)
     await $.state.set(APPLIED, applied)
-    $.ui.status(`omni:${profile} · ${sendModel}/${target.effort}`)
+    const { value: lastClass } = await $.state.get(LAST_CLASS)
+    const classed = profile === 'auto' && isAutoClass(lastClass?.label) ? `${lastClass?.label} → ` : ''
+    $.ui.status(`omni:${profile} · ${classed}${sendModel}/${target.effort}`)
     return yield* next({ ...e, model: sendModel, effort: target.effort })
   })
 

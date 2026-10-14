@@ -195,11 +195,12 @@ test('the step badge names the class under auto, and drops it when the last atte
   rig.label = 'trivial'
   await $.prompt.submit(SUBMIT('rename a variable'))
   await step($)
-  expect(rig.statuses[rig.statuses.length - 1]).toBe('omni:auto · trivial → sonnet/low')
+  // the step already runs on sonnet, so its model id is sent unchanged and the badge names it
+  expect(rig.statuses[rig.statuses.length - 1]).toBe('omni:auto · trivial → claude-sonnet-5-5/low')
   rig.label = 'banana'
   await $.prompt.submit(SUBMIT('anything'))
   await step($)
-  expect(rig.statuses[rig.statuses.length - 1]).toBe('omni:auto · sonnet/low')
+  expect(rig.statuses[rig.statuses.length - 1]).toBe('omni:auto · claude-sonnet-5-5/low')
 })
 
 test('the current model is the one a step applied, even before any classification', async ($, on) => {

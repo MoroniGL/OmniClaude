@@ -211,10 +211,97 @@ test('a 1M-context main loop keeps its [1m] window on opus and sonnet', async ($
   const seen: any[] = []
   on('turn.step', async function* (_$, e) { seen.push(e); return STEP_RESULT(e) })
   await ready($, on, 'balanced')
-  await drain($.turn.step(STEP('claude-opus-5-5[1m]', 'high')))
+  await drain($.turn.step(STEP('claude-sonnet-5-5[1m]', 'high')))
   expect(seen[0].model).toBe('opus[1m]')
   expect(seen[0].effort).toBe('medium')
   expect(await status($)).toContain('applied (last step): opus[1m]/medium')
+})
+
+test('a step already on the profile tier and effort is sent unchanged', async ($, on) => {
+  const seen: any[] = []
+  on('turn.step', async function* (_$, e) { seen.push(e); return STEP_RESULT(e) })
+  await ready($, on, 'balanced')
+  const step = STEP('claude-opus-5-5', 'medium')
+  await drain($.turn.step(step))
+  expect(seen[0].model).toBe('claude-opus-5-5')
+  expect(seen[0].effort).toBe('medium')
+  expect(await status($)).toContain('applied (last step): claude-opus-5-5/medium')
+})
+
+test('a step on the profile tier keeps its model id and gets only the effort', async ($, on) => {
+  const seen: any[] = []
+  on('turn.step', async function* (_$, e) { seen.push(e); return STEP_RESULT(e) })
+  await ready($, on, 'balanced')
+  await drain($.turn.step(STEP('claude-opus-5-5', 'high')))
+  await drain($.turn.step(STEP('claude-opus-5-5[1m]', 'high')))
+  expect(seen[0].model).toBe('claude-opus-5-5')
+  expect(seen[0].effort).toBe('medium')
+  expect(seen[1].model).toBe('claude-opus-5-5[1m]')
+  expect(seen[1].effort).toBe('medium')
+})
+
+test('a step on another tier is rewritten to the profile alias', async ($, on) => {
+  const seen: any[] = []
+  on('turn.step', async function* (_$, e) { seen.push(e); return STEP_RESULT(e) })
+  await ready($, on, 'economy')
+  await drain($.turn.step(STEP('claude-opus-5-5', 'medium')))
+  expect(seen[0].model).toBe('sonnet')
+  expect(seen[0].effort).toBe('medium')
+})
+
+test('a main-loop step whose hook fails goes on unchanged and says so', async ($, on) => {
+  const seen: any[] = []
+  const statuses: string[] = []
+  on('turn.step', async function* (_$, e) { seen.push(e); return STEP_RESULT(e) })
+  on('ui.status', async (_$: any, e: any) => { statuses.push(String(e.text)); return { value: undefined } })
+  // No mock.store: $.store.get has no implementation, so resolving the profile throws inside the hook.
+  await drain($.turn.step(STEP('claude-sonnet-5-5', 'high')))
+  expect(seen.length).toBe(1)
+  expect(seen[0].model).toBe('claude-sonnet-5-5')
+  expect(seen[0].effort).toBe('high')
+  expect(statuses[statuses.length - 1]).toBe('omni:? · not applied (hook error)')
+})
+
+const ENGINE = { plugin: 'engine', tier: 'core' }
+
+test('engine built-ins other than Explore, Plan and general-purpose keep their own model', async ($, on) => {
+  const spawned: any[] = []
+  on('agent.spawn', async (_$, e) => { spawned.push(e); return { model: e.model ?? 'inherit', agentId: 'a1' } })
+  await ready($, on, 'quality')
+  await $.agent.spawn({ ...SPAWN('claude-code-guide'), provider: ENGINE } as any)
+  await $.agent.spawn({ ...SPAWN('Explore'), provider: ENGINE } as any)
+  await $.agent.spawn({ ...SPAWN('general-purpose'), provider: ENGINE } as any)
+  expect(spawned[0].model).toBeUndefined()
+  expect(spawned[1].model).toBe('sonnet')
+  expect(spawned[2].model).toBe('opus')
+})
+
+test('a workflow agent of a routed type is passed through untouched', async ($, on) => {
+  const spawned: any[] = []
+  on('agent.spawn', async (_$, e) => { spawned.push(e); return { model: e.model ?? 'inherit', agentId: 'a1' } })
+  await ready($, on, 'economy')
+  await $.agent.spawn({ ...SPAWN('general-purpose'), workflow: { runId: 'wf_1', agentIndex: 1 } } as any)
+  expect(spawned.length).toBe(1)
+  expect(spawned[0].model).toBeUndefined()
+})
+
+test('/omni status shows the last spawn and the model it was sent', async ($, on) => {
+  on('agent.spawn', async (_$, e) => ({ model: e.model ?? 'inherit', agentId: 'a1' }))
+  await ready($, on, 'economy')
+  expect(await status($)).toContain('last spawn: none yet')
+  await $.agent.spawn(SPAWN('Explore'))
+  expect(await status($)).toContain('last spawn: Explore → haiku')
+  await $.agent.spawn({ ...SPAWN('fork'), fork: true } as any)
+  expect(await status($)).toContain('last spawn: fork → unchanged')
+})
+
+test('astra-expert under another plugin name is gated too', async ($, on) => {
+  const spawned: any[] = []
+  on('agent.spawn', async (_$, e) => { spawned.push(e); return { model: e.model ?? 'inherit', agentId: 'a1' } })
+  await ready($, on, 'quality')
+  const denied: any = await $.agent.spawn(SPAWN('omniclaude-dev:astra-expert'))
+  expect(denied.deny).toBe(ASTRA_DENY)
+  expect(spawned.length).toBe(0)
 })
 
 test('a 1M-context main loop under economy gets sonnet[1m]', async ($, on) => {

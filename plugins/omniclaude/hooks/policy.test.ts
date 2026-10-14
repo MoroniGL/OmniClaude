@@ -1,7 +1,7 @@
 import { test, expect } from 'claude-code/testing'
 import {
   PROFILES, WORKER_TIERS, tierOf, clampWorkerModel, spawnModel,
-  planForClass, decideAutoModel,
+  planForClass, decideAutoModel, mainLoopModel, routesSpawn, isAstraType, spawnProfile,
 } from './policy'
 
 test('profile table matches the spec', async () => {
@@ -59,6 +59,31 @@ test('spawnModel routes built-ins and model-less agents by profile', async () =>
   expect(spawnModel('balanced', 'omniclaude:terra-explorer', 'sonnet', undefined)).toBeUndefined()
   expect(spawnModel('balanced', 'some-plugin:writer', 'opus', undefined)).toBe('sonnet')
   expect(spawnModel('balanced', 'some-plugin:writer', undefined, undefined)).toBe('sonnet')
+})
+
+test('mainLoopModel rewrites only across tiers and keeps a 1M window on opus and sonnet', async () => {
+  expect(mainLoopModel('claude-opus-5-5', 'opus')).toBe('claude-opus-5-5')
+  expect(mainLoopModel('claude-opus-5-5[1m]', 'opus')).toBe('claude-opus-5-5[1m]')
+  expect(mainLoopModel('claude-opus-5-5', 'sonnet')).toBe('sonnet')
+  expect(mainLoopModel('claude-sonnet-5-5[1m]', 'opus')).toBe('opus[1m]')
+  expect(mainLoopModel('claude-opus-5-5[1m]', 'fable')).toBe('fable')
+  expect(mainLoopModel('claude-opus-5-5[1m]', 'haiku')).toBe('haiku')
+  expect(mainLoopModel('some-proxy-model', 'opus')).toBe('opus')
+})
+
+test('only Explore, Plan and general-purpose among engine agents are routed; astra is matched under any plugin name', async () => {
+  expect(routesSpawn('Explore', 'engine')).toBe(true)
+  expect(routesSpawn('Plan', 'engine')).toBe(true)
+  expect(routesSpawn('general-purpose', 'engine')).toBe(true)
+  expect(routesSpawn('claude-code-guide', 'engine')).toBe(false)
+  expect(routesSpawn('statusline-setup', 'engine')).toBe(false)
+  expect(routesSpawn('some-plugin:writer', 'some-plugin')).toBe(true)
+  expect(routesSpawn('omniclaude:terra-explorer', 'omniclaude')).toBe(true)
+  expect(isAstraType('omniclaude:astra-expert')).toBe(true)
+  expect(isAstraType('omniclaude-dev:astra-expert')).toBe(true)
+  expect(isAstraType('astra-expert-helper')).toBe(false)
+  expect(spawnProfile('auto')).toBe('balanced')
+  expect(spawnProfile('economy')).toBe('economy')
 })
 
 test('planForClass maps the four classes', async () => {

@@ -1,4 +1,4 @@
-import type { Applied, LastClass, LastStep, Plan, Profile, Verified } from '../types'
+import type { Applied, LastClass, LastSpawn, LastStep, Plan, Profile, Verified } from '../types'
 import { PROFILES } from './policy'
 
 // Pure helpers only. The engine's `$` is followed only into functions declared in the same file as the call
@@ -57,6 +57,16 @@ export function saveNote(profile: Profile, override: unknown): string {
     : `\n  saved ${profile}: applies now (no session override) and in future sessions.`
 }
 
+/** The session-scoped system-prompt section: what the hooks route, what they do not, and when to delegate. */
+export function policySection(profile: Profile): string {
+  return [
+    `OmniClaude (omni:${profile}) is active: a plugin hook sets this conversation's model and effort from the profile and routes Explore, Plan, general-purpose and other non-OmniClaude subagents to its tiers;`,
+    'OmniClaude workers (omniclaude:luna-researcher, omniclaude:terra-explorer, omniclaude:terra-implementer, omniclaude:sol-*) keep their own tiers; forks, teammates and workflow agents are not routed.',
+    'Prefer omniclaude:terra-explorer for codebase mapping and omniclaude:luna-researcher for docs/search instead of reading many files yourself; use omniclaude:terra-implementer for bounded implementation; keep tiny single-file work here.',
+    'omniclaude:astra-expert is refused until the user agrees (/omni astra allow, or the max profile). Details: the omniclaude:routing skill.',
+  ].join(' ')
+}
+
 /** A profile named by an environment variable (OMNICLAUDE_PROFILE, or EVAL_OMNICLAUDE_PROFILE in a `plugin eval` child). */
 export type EnvProfile = { name: string; profile: Profile }
 
@@ -72,6 +82,7 @@ export type StatusView = {
   applied: Applied | null | undefined
   verified: Verified | null | undefined
   lastClass: LastClass | null | undefined
+  lastSpawn: LastSpawn | null | undefined
   consent: boolean
   consentFromMax: boolean
 }
@@ -91,6 +102,7 @@ export function formatStatus(v: StatusView): string {
     `  engine requested (last step): ${v.last ? `${v.last.model}/${String(v.last.effort ?? 'default')}` : 'none yet'}`,
     `  applied (last step): ${v.applied ? `${v.applied.model}/${String(v.applied.effort ?? 'default')}` : 'none yet'}`,
     `  verified (last turn, API-reported): ${v.verified ? v.verified.model : 'none yet'}`,
+    `  last spawn: ${v.lastSpawn ? `${v.lastSpawn.subagentType} → ${v.lastSpawn.model ?? 'unchanged'}` : 'none yet'}`,
     `  astra consent: ${v.consent ? (v.consentFromMax ? 'yes (set by max)' : 'yes') : 'no'}`,
   ].join('\n')
 }

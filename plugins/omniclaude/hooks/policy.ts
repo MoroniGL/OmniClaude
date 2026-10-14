@@ -33,6 +33,36 @@ export function tierOf(model: string): Tier | undefined {
   return undefined
 }
 
+/** The fixed profile whose spawn table applies; auto borrows balanced's table. */
+export function spawnProfile(profile: Profile): FixedProfile {
+  return profile === 'auto' ? 'balanced' : profile
+}
+
+/**
+ * The model a main-loop step is sent: the engine's own id when its tier already matches (no rewrite),
+ * else the profile alias, keeping a 1M window on opus/sonnet (haiku and fable have no `[1m]` alias).
+ */
+export function mainLoopModel(engineModel: string, target: Tier): string {
+  if (tierOf(engineModel) === target) return engineModel
+  const keepsWindow = engineModel.trim().toLowerCase().endsWith('[1m]') && (target === 'opus' || target === 'sonnet')
+  return keepsWindow ? `${target}[1m]` : target
+}
+
+export const ASTRA = 'omniclaude:astra-expert'
+
+/** astra-expert under OmniClaude's name or any other plugin name a marketplace gave it. */
+export function isAstraType(subagentType: string): boolean {
+  return subagentType === ASTRA || subagentType.endsWith(':astra-expert')
+}
+
+/** Engine built-ins the profile routes; any other engine agent (claude-code-guide, statusline-setup, ...) keeps its own model. */
+const ROUTED_ENGINE_AGENTS: readonly string[] = ['Explore', 'Plan', 'general-purpose']
+
+/** Whether the profile sets a spawn's model: every plugin's agent, and among the engine's own only Explore, Plan and general-purpose. */
+export function routesSpawn(subagentType: string, providerPlugin: string | undefined): boolean {
+  return providerPlugin !== 'engine' || ROUTED_ENGINE_AGENTS.includes(subagentType)
+}
+
 export function clampWorkerModel(workerTier: Tier, requested: string | undefined, profile: Profile): string | undefined {
   if (requested === undefined) return undefined
   if (profile === 'max') return requested

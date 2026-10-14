@@ -13,8 +13,8 @@ Choose a profile with `/omni <profile>` (this session), `/omni save <profile>` (
 Notes:
 
 - `/omni save <profile>` applies now when no session override stands in front of it, and in future sessions. With an override, the saved profile waits until `/omni reset`.
-- A value in either environment variable that names no profile counts as unset. The environment outranks the picker because the engine always fills the picker with its default (`auto`). `EVAL_OMNICLAUDE_PROFILE` is what a `claude plugin eval` with-plugin session inherits.
-- Prompts from `claude -p`, the SDK and `plugin eval` do not come from the composer, so `auto` never classifies them. Pick a fixed profile for such runs, for example `OMNICLAUDE_PROFILE=economy claude -p "..."`.
+- A value in either environment variable that names no profile counts as unset. The environment outranks the picker, whose manifest default is `auto`. `EVAL_OMNICLAUDE_PROFILE` is what a `claude plugin eval` with-plugin session inherits.
+- Prompts from `claude -p`, the SDK and `plugin eval` reportedly do not come from the composer, so `auto` never classifies them. Pick a fixed profile for such runs, for example `OMNICLAUDE_PROFILE=economy claude -p "..."`.
 
 ## Enforced by the mod
 
@@ -31,7 +31,7 @@ Rules:
 - **Model ids.** The engine rejects aliases in `turn.step`; the mod sends full model ids (live-verified 2026-10-14): `claude-haiku-5-5`, `claude-sonnet-5-5`, `claude-opus-5-5`, `claude-fable-5-1`.
 - **Main loop.** A step whose model is already on the profile's tier keeps the engine's own id and gets the profile's effort; a step on another tier is rewritten to the tier's id. When the engine's model carries a `[1m]` suffix, a rewritten Opus or Sonnet id keeps it. Fable and Haiku have no 1M form, so `max` sends plain `claude-fable-5-1`. (The `[1m]` form of a full id has not been live-tested.)
 - **OmniClaude workers.** A worker's own frontmatter tier is applied as it is (luna Haiku, terra Sonnet, sol Opus, astra Fable). If a caller passes a `model` above that tier, or one the mod cannot place, the mod replaces it with the tier's id, except under `max`, where the request stands. A `model` at or below the tier stands.
-- **Other agents.** Explore gets the profile's explore tier. Plan, general-purpose and every agent that does not come from the engine itself (other plugins' agents and your own) get the profile's general tier; Plan follows the general tier. With no request, the profile's tier applies. With an explicit `model` request, a request above the profile's tier (or one the mod cannot place) is replaced by the tier's id and one at or below it stands; under `max` the request stands. The mod cannot read a custom agent's own frontmatter model, so custom agents are routed this way too.
+- **Other agents.** Explore gets the profile's explore tier. Plan and general-purpose get the profile's general tier (Plan follows the general tier), and so does any other routed agent: other plugins' agents are routed by profile; agents of your own are routed only if the engine reports them as non-engine-provided (not live-verified). With no request, the profile's tier applies. With an explicit `model` request, a request above the profile's tier (or one the mod cannot place) is replaced by the tier's id and one at or below it stands; under `max` the request stands. The mod cannot read a custom agent's own frontmatter model, so a routed custom agent gets the profile's tier whatever its frontmatter says.
 - **Engine built-ins.** Among the engine's own agents only Explore, Plan and general-purpose are routed. Others (claude-code-guide, statusline-setup and the like) keep their own model.
 - **Not routed.** Forks, teammates and workflow agents are not rewritten. The consent gate below still applies to a teammate or workflow agent of type `astra-expert`.
 - **Effort** on subagent loops is not rewritten; the worker's own effort applies.
@@ -39,9 +39,10 @@ Rules:
   - `/omni astra allow`;
   - `/omni max`;
   - `/omni save max`, when `max` becomes the effective profile;
+  - `/omni reset` back to a saved `max`;
   - session start, when the resolved profile is `max` (also through `OMNICLAUDE_PROFILE=max`).
 
-  Consent that `max` sets is cleared when you leave `max`; consent you gave with `/omni astra allow` survives profile changes. `/omni astra deny` clears the flag and keeps astra-expert denied even under `max`. Fable may bill usage credits on some plans.
+  Consent that `max` sets is cleared when you leave `max` via `/omni` (a `/config` change or another session's save does not clear it); consent you gave with `/omni astra allow` survives profile changes. `/omni astra deny` clears the flag and keeps astra-expert denied even under `max`. Fable may bill usage credits on some plans.
 - **Records and failures.** The mod records the last spawn it decided (`/omni status`, "last spawn": the agent type and the id it set, or `unchanged`). The record never denies a spawn. If the spawn guard itself fails before it passes the spawn on, the spawn is refused. If `turn.step` fails, the step runs unchanged and the badge reads `not applied (hook error)`.
 
 Every row says what the mod **applies**. What the API reports back is shown separately, as "verified" in `/omni status`.
@@ -110,7 +111,7 @@ The desktop app has no `--settings` equivalent. With the mod on, use `/omni`. Wi
 
 ## Optional: the advisor
 
-Claude Code has an experimental advisor feature (official docs at https://code.claude.com/docs/en/advisor, checked 2026-10-14). The advisor is optional and OmniClaude does not configure or automate it; it is not measured: a manual arm showed no advisor call on these small prompts.
+Claude Code has an experimental advisor feature (official docs at https://code.claude.com/docs/en/advisor, checked 2026-10-14). The advisor is optional and OmniClaude does not configure or automate it; it is not measured: a manual arm recorded no advisor use on these small prompts.
 
 - A stronger model that the main model can consult. Set it with `/advisor opus`, the `advisorModel` setting, or `--advisor`.
 - Anthropic API only (subscriptions included). Claude decides when to consult it; on each call the advisor reads the whole conversation, billed at the advisor's own rates.

@@ -230,28 +230,30 @@ spec. The sections above stay as written; where they disagree, this section wins
 
 1. **The astra gate reads the consent flag.** The flag is the gate's only input.
    `/omni astra allow`, `/omni max`, `/omni save max` (when `max` becomes the effective
-   profile) and a session that starts on `max` set it; consent that `max` sets is cleared
-   when the profile leaves `max`, while an explicit `allow` survives. `/omni astra deny`
+   profile), `/omni reset` back to a saved `max`, and a session that starts on `max` set
+   it; consent that `max` sets is cleared when the profile leaves `max` via `/omni` (a
+   `/config` change or another session's save does not clear it), while an explicit
+   `allow` survives. `/omni astra deny`
    denies astra-expert even under `max`. (Changes section 3, "`max` sets the flag once".)
 2. **Environment profile fallback.** The profile in force is the session override, else
    the plugin store (`/omni save`), else `OMNICLAUDE_PROFILE` (then
    `EVAL_OMNICLAUDE_PROFILE`), else the `/config` option, else `auto`. Eval and SDK
-   prompts are not composer prompts, so `auto` never classifies them, and the engine
-   always fills the option with its default; the environment picks a profile for those
-   runs. (Extends section 5.)
+   prompts reportedly are not composer prompts, so `auto` never classifies them, and the
+   option's manifest default is `auto`; the environment picks a profile for those runs. (Extends section 5.)
 3. **Full model ids.** `turn.step` rejects aliases (live, 2026-10-14:
    `unrecognized_model`, HTTP 404, for `opus`); the mod sends `claude-haiku-5-5`,
    `claude-sonnet-5-5`, `claude-opus-5-5` and `claude-fable-5-1`, and keeps a `[1m]`
    suffix on Opus and Sonnet ids. (Settles the first risk in section 10.)
 4. **Only Explore, Plan and general-purpose are routed among engine built-ins.** Other
-   engine agents keep their own model; agents from plugins (and the user's own) are
-   routed by profile. (Narrows section 3, "any model-less agent".)
+   engine agents keep their own model; other plugins' agents are routed by profile; agents
+   of your own are routed only if the engine reports them as non-engine-provided (not
+   live-verified). (Narrows section 3, "any model-less agent".)
 5. **Explicit requests on non-OmniClaude agents are clamped** to the profile's tier for
    that agent, except under `max`; a request at or below the tier stands. (Extends
    section 3, which spoke only of workers.)
 6. **Plan follows the general tier** (Explore has its own).
 7. **Kept-for-cache effort is `high`:** when `auto` holds the model back from the class's
-   wish, it raises effort to `high`. (Fixes the effort of section 4's cache rule.)
+   wish, it raises effort to `high`. (Restates section 4's cache rule.)
 8. **`auto`'s current model comes from the steps applied under `auto`,** and from the
    plan before any such step; a step run under a fixed profile does not count.
    Switching profile drops the plan and the last classification.

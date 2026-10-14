@@ -6,17 +6,17 @@ OmniClaude separates **policy**, **control plane**, **execution plane**, and **r
 The `routing` skill decides: is this work substantial, which bounded phases exist, which is the cheapest capable worker, and is escalation justified. The skill is also what authorizes delegation, since Claude Code's built-in prompt can discourage delegation unless a `CLAUDE.md` file or a skill asks for it (observed in the 2.1.295 binary's prompt text; not a documented contract). In Stage 1 the skill did not fire in the traced runs, so the mod also adds one short, session-scoped routing-policy section to the system prompt (`omniclaude:policy`). Neither forces Claude to delegate.
 
 ## Control plane
-The parent conversation owns decomposition, delegation, dependency tracking, acceptance, and escalation. A profile sets the parent's model and effort, the tier of subagents that have no model of their own, and whether `astra-expert` needs consent.
+The parent conversation owns decomposition, delegation, dependency tracking, acceptance, and escalation. A profile sets the parent's model and effort, the tier of the subagents the mod routes, and whether `astra-expert` needs consent.
 
-The mod applies the profile. It lives in `plugins/omniclaude/hooks/` and loads on Claude Code engine 2.1.287 or later. The profile in force is resolved on every hook call, in this order: the session override, the saved profile (`$.store`), the environment variable `OMNICLAUDE_PROFILE` else `EVAL_OMNICLAUDE_PROFILE` (read through `$.env`; a value that is no profile, or a failed read, counts as unset), the `/config` option, `auto`. The environment variable is how headless and `plugin eval` runs pick a profile, because their prompts are not typed in the composer and `auto` does not classify them.
+The mod applies the profile. It lives in `plugins/omniclaude/hooks/` and loads on Claude Code engine 2.1.287 or later. The profile in force is resolved on every hook call, in this order: the session override, the saved profile (`$.store`), the environment variable `OMNICLAUDE_PROFILE` else `EVAL_OMNICLAUDE_PROFILE` (read through `$.env`; a value that is no profile, or a failed read, counts as unset), the `/config` option, `auto`. The environment variable is how headless and `plugin eval` runs pick a profile, because their prompts reportedly do not come from the composer, so `auto` does not classify them.
 
 | Hook | What it does |
 |---|---|
 | `session.start` | registers `/omni`; when the resolved profile is `max`, sets the astra consent as `/omni max` does; shows the `omni:<profile>` badge |
-| `command.run` (`/omni`) | `status`, `<profile>`, `save <profile>`, `reset`, `astra allow\|deny`, `doctor`; text answers only, nothing enters the model's context; entering `max` sets the astra consent, leaving `max` clears the consent that `max` set |
+| `command.run` (`/omni`) | `status`, `<profile>`, `save <profile>`, `reset`, `astra allow\|deny`, `doctor`; text answers only, nothing enters the model's context; entering `max` sets the astra consent, leaving `max` via an `/omni` command clears the consent that `max` set (a `/config` change does not); `/omni reset` back to a saved `max` sets it |
 | `prompt.submit` | under `auto`, classifies each prompt typed in the composer (`$.model.classify`, 2.5 s timeout) and records the plan and the class; no label, a failed request or a timeout keeps the plan; other origins are left alone |
 | `turn.step` | rewrites the model (full model ids, and only across tiers) and the effort of main-loop requests; records what the engine asked for (`lastStep`) and what was applied (`applied`); subagent steps are not touched; if the hook fails, the step runs unchanged and the badge reads `not applied (hook error)` |
-| `agent.spawn` | the astra consent gate (it reads only the consent flag), then the worker-tier clamp and the profile tier for Explore, Plan, general-purpose and agents that do not come from the engine; the engine's other built-in agents, forks, teammates and workflow agents are not rewritten; records the decision (`lastSpawn`), and that record never denies a spawn; if the guard fails before the spawn is passed on, the spawn is refused |
+| `agent.spawn` | the astra consent gate (it reads only the consent flag), then the worker-tier clamp and the profile tier for Explore, Plan, general-purpose and other plugins' agents (agents of your own only if the engine reports them as non-engine-provided; not live-verified); the engine's other built-in agents, forks, teammates and workflow agents are not rewritten; records the decision (`lastSpawn`), and that record never denies a spawn; if the guard fails before the spawn is passed on, the spawn is refused |
 | `prompt.compose` | adds the session-scoped `omniclaude:policy` section |
 | `turn.complete` | records the API-reported model (`usage.model`) of the main-loop turn as "verified"; a turn that reports no usage clears it |
 
@@ -40,7 +40,7 @@ Live-verified on 2026-10-14 (engine 2.1.295, headless runs): the engine rejects 
 
 ## Delivery
 - Stage 1: agents, skill, CLI profile files, eval suite. No hooks.
-- Stage 2 (this release, experimental): the mod, `/omni`, the saved profile in the plugin's own store (replacing the planned `setup.py` and persisted settings), and eval indicators for delegation and skill use. The Stage 2 measurement is recorded in `docs/local-validation.md`: `economy` cut cost 24% to 47% per run and `balanced` raised it 10% to 61%, with identical scores and zero delegation.
+- Stage 2 (this release, experimental): the mod, `/omni`, the saved profile in the plugin's own store (replacing the planned `setup.py` and persisted settings), and eval indicators for delegation and skill use. The Stage 2 measurement is recorded in `docs/local-validation.md`: `economy` cut cost 24% to 47% per run and `balanced` raised it 10% to 61%, with identical scores and zero delegation in all 24 with-plugin runs.
 - Phase 2: Gemini context offload.
 
 ## Safety invariant

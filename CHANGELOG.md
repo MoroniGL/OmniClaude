@@ -9,6 +9,6 @@
 - `routing` skill with on-demand routing and efficiency references.
 - CLI profile files for `claude --settings` (economy, balanced, quality, max).
 - Offline asset tests, CI, and a `claude plugin eval` suite with a no-plugin baseline.
-- `docs/local-validation.md` records the local install and live delegation evidence.
+- `docs/local-validation.md` records the local install and explicit-dispatch evidence.
 - No hooks, no settings written by the plugin itself (installing records it in settings, as any plugin does), no savings claims.
-- Stage 1 eval (4 synthetic cases, Opus 5.5 parent): identical quality with and without the plugin, equal or higher cost with it, no delegation in the 8 counted with-plugin runs, routing skill not invoked in the 2 traced runs. Recorded in docs/local-validation.md; no savings claim.
+- Stage 1 eval (4 synthetic cases, Opus 5.5 parent): identical grader scores (1.00, the ceiling) with and without the plugin, higher cost with it in all four cases (+3% to +66% per run), no delegation in the 8 counted with-plugin runs, routing skill not invoked in the 2 traced runs. Recorded in docs/local-validation.md; no savings claim.

@@ -99,16 +99,16 @@ On 2026-10-14 the with/without-plugin eval ran from `plugins/omniclaude` (engine
 claude plugin eval . --scaffold --allow-tools Edit Write --model claude-opus-5-5 --runs 3 -j 2 --max-cost-usd 15 --no-publish --trust-plugin --json omni-eval.json
 ```
 
-The parent model was pinned to `claude-opus-5-5` in both arms; the judge model was the default (Haiku). The suite was 4 cases × 3 runs × 2 arms = 24 agent runs plus Haiku judge calls. Exit code 0, `partial: false`, suite wall time 192 s, total list-price cost US$ 2.11. The full JSON is `.superpowers/sdd/2026-10-13-omniclaude-stage1-core/task-9-eval-result.json` and the HTML report is `plugins/omniclaude/evals/results/2026-10-14T10-13-32-943Z/report.html`. Both paths are git-ignored, so they exist only on the machine that ran the eval. No savings claim is made.
+The parent model was pinned to `claude-opus-5-5` in both arms; the judge model was the default (Haiku). The suite was 4 cases × 3 runs × 2 arms = 24 agent runs plus Haiku judge calls. Exit code 0, `partial: false`, suite wall time 192 s, agent-run list-price cost US$ 2.11 (the JSON `costUsd`; judge calls add roughly US$ 0.005 more). The full JSON is `.superpowers/sdd/2026-10-13-omniclaude-stage1-core/task-9-eval-result.json` and the HTML report is `plugins/omniclaude/evals/results/2026-10-14T10-13-32-943Z/report.html`. Both paths are git-ignored, so they exist only on the machine that ran the eval. No savings claim is made.
 
-Scores are the mean per case (1.00 means every grader passed in every run). Costs are the mean list-price estimate per run in US$, cache reads and writes included, judge cost excluded.
+Scores are the mean per case (1.00 means every scored grader passed in every run). Costs are the mean list-price estimate per run in US$, cache reads and writes included, judge cost excluded.
 
 | Case | WITH score | W/OUT score | Δ | WITH cost | W/OUT cost | Delegated (with-arm) | Models served (with-arm) |
 |---|---|---|---|---|---|---|---|
-| docs-lookup | 1.00 | 1.00 | 0.00 | 0.1058 | 0.0638 | not counted (only `no-astra`: 0 `astra-expert` dispatches in 3 runs) | claude-opus-5-5 (parent); worker dispatch not counted |
-| implement-discount | 1.00 | 1.00 | 0.00 | 0.1058 | 0.1024 | not counted (only `no-astra`: 0 `astra-expert` dispatches in 3 runs) | claude-opus-5-5 (parent); worker dispatch not counted |
-| scout-call-sites | 1.00 | 1.00 | 0.00 | 0.1043 | 0.1007 | 0 of 3 runs | claude-opus-5-5 only (parent); no worker dispatched |
-| tiny-edit | 1.00 | 1.00 | 0.00 | 0.0652 | 0.0569 | 0 of 3 runs | claude-opus-5-5 only (parent); no worker dispatched |
+| docs-lookup | 1.00 | 1.00 | 0.00 | 0.1058 | 0.0638 | not counted (only `no-astra`: 0 `astra-expert` dispatches in 3 runs) | parent pinned to claude-opus-5-5 (requested); served model not observed in the suite runs; one diagnostic trace showed only claude-opus-5-5 |
+| implement-discount | 1.00 | 1.00 | 0.00 | 0.1058 | 0.1024 | not counted (only `no-astra`: 0 `astra-expert` dispatches in 3 runs) | parent pinned to claude-opus-5-5 (requested); served model not observed in the suite runs |
+| scout-call-sites | 1.00 | 1.00 | 0.00 | 0.1043 | 0.1007 | 0 of 3 runs | parent pinned to claude-opus-5-5 (requested); served model not observed in the suite runs; one diagnostic trace showed only claude-opus-5-5 |
+| tiny-edit | 1.00 | 1.00 | 0.00 | 0.0652 | 0.0569 | 0 of 3 runs | parent pinned to claude-opus-5-5 (requested); served model not observed in the suite runs |
 
 How delegation was counted:
 - scout-call-sites: the `delegated` grader (Agent calls whose input matches `omniclaude:`, WITH arm only) failed in all 3 WITH runs with "Agent called 0x (expected 1..∞)". The parent never dispatched an OmniClaude worker.
@@ -123,14 +123,14 @@ Two extra single-arm (WITH only), single-run diagnostics were run on 2026-10-14 
 - scout-call-sites: 10 turns; tools used: Grep ×3, Glob ×1, Read ×5; `Skill` tool calls: 0; `Agent` tool calls: 0; models in the trace: claude-opus-5-5 only; usage 45,740 cache-write + 122,065 cache-read + 908 output tokens. The only mention of "omniclaude" in the trace is the system prompt's agent/skill listing.
 - docs-lookup: 4 turns; tools used: Grep ×1, Read ×2; `Skill` calls: 0; `Agent` calls: 0; claude-opus-5-5 only; usage 8,436 cache-write + 41,470 cache-read + 309 output tokens.
 
-The `routing` skill never fired on these prompts and the parent never delegated. `Skill`-tool calls were counted only in these two diagnostic runs, not in the 12 suite runs.
+The `routing` skill did not fire in either run and the parent never delegated. `Skill`-tool calls were counted only in these two diagnostic runs, not in the 12 suite runs.
 
 ### Conclusion
 
 - Cost did not go down on any task shape. Mean cost per run with the plugin was higher on all four cases: docs-lookup +66%, tiny-edit +15%, scout-call-sites +4%, implement-discount +3%. The +66% case is noisy: its three WITH runs cost 0.1273 / 0.1218 / 0.0683 against 0.0658 / 0.0662 / 0.0592 W/OUT. These are per-case results of this one suite, not a general cost figure.
-- Quality held. Every case scored 1.00 in both arms, every grader passed in all 24 runs, and Δ = 0.00 everywhere. The plugin neither helped nor hurt correctness on these tasks.
-- Delegation: 0 Agent-tool calls in the 8 with-plugin runs where it was counted (scout-call-sites ×3 via `delegated`, tiny-edit ×3 via `no-delegation`, plus the 2 traced diagnostic runs); the 6 docs-lookup and implement-discount suite runs had only the `no-astra` counter, so general Agent use there is unobserved.
-- The plugin's only runtime effect in this suite was its always-on context (~636 tokens per session, from `plugin details`), a fixed overhead. Because no delegation was observed in the counted runs, no cheaper-tier execution was seen to offset it.
+- Quality held. Every case scored 1.00 in both arms, every scored grader passed in all 24 runs (the unscored, with-only `delegated` indicator failed in the 3 scout-call-sites WITH runs), and Δ = 0.00 everywhere. The plugin neither helped nor hurt correctness on these tasks.
+- Delegation: no OmniClaude-worker dispatch in the 8 counted with-plugin runs (scout-call-sites ×3: 0 Agent calls matching `omniclaude:`; tiny-edit ×3 and the 2 traced diagnostics: 0 Agent calls of any kind). The 6 docs-lookup and implement-discount suite runs had only the `no-astra` counter, so general Agent use there is unobserved.
+- In the 2 traced runs the plugin's only visible runtime effect was its always-on context (~636 tokens per `plugin details`); the cause of the per-case cost gap (largest on docs-lookup, +US$ 0.042 per run, versus +US$ 0.008 on tiny-edit with identical turn counts) was not established.
 
 Caveats:
 - Costs are list-price estimates, not billed amounts.

@@ -12,9 +12,10 @@ async function omni($: any, args: string): Promise<string> {
 }
 
 // Bottom hooks for everything the plugin raises on session.start and /omni, then start the session.
-async function ready($: any, on: any, store: Record<string, unknown> = {}): Promise<string[]> {
+async function ready($: any, on: any, store: Record<string, unknown> = {}, env?: Record<string, string>): Promise<string[]> {
   const statuses: string[] = []
   mock.store(on, store)
+  if (env) mock.env(on, env)
   on('session.start', async (_$: any, e: any) => ({ cwd: e.cwd }))
   on('command.register', async (_$: any, e: any) => ({ value: { command: e.name } }))
   on('session.version', async () => ({ value: { version: '2.1.295' } }))
@@ -92,7 +93,7 @@ test('/omni save persists the profile without touching the session override', as
   const saved = await omni($, 'save quality')
   expect(saved).toContain('saved profile: quality')
   expect(saved).toContain('session override: none')
-  expect(saved).toContain('saved quality for future sessions')
+  expect(saved).toContain('saved quality: applies now (no session override) and in future sessions.')
   // read back from a later, separate command: the store holds it
   const later = await omni($, 'status')
   expect(later).toContain('saved profile: quality')
@@ -151,12 +152,112 @@ test('an /omni astra allow given while on max makes the consent explicit', async
   expect(await omni($, 'quality')).toContain('astra consent: yes')
 })
 
-test('under max the status shows the max consent, even after a deny', async ($, on) => {
+test('under max the status says the consent was set by max, and /omni astra deny takes it away', async ($, on) => {
+  const spawned: any[] = []
+  on('agent.spawn', async (_$, e) => { spawned.push(e); return { model: e.model ?? 'inherit', agentId: 'a1' } })
+  const statuses = await ready($, on, {})
+  expect(await omni($, 'max')).toContain('astra consent: yes (set by max)')
+  expect(await omni($, 'astra deny')).toContain('astra consent: no')
+  // the badge no longer says astra-expert is allowed
+  expect(statuses[statuses.length - 1]).not.toContain('astra-expert allowed')
+  expect(await omni($, 'status')).toContain('astra consent: no')
+  // the gate reads only the flag: denied even under max
+  const denied: any = await $.agent.spawn({ prompt: 'p', description: 'd', subagentType: 'omniclaude:astra-expert' })
+  expect(denied.deny).toBe(ASTRA_DENY)
+  expect(spawned.length).toBe(0)
+  expect(await omni($, 'astra allow')).toContain('astra consent: yes')
+})
+
+test('a session that starts on max has the consent set by max', async ($, on) => {
+  const spawned: any[] = []
+  on('agent.spawn', async (_$, e) => { spawned.push(e); return { model: e.model ?? 'inherit', agentId: 'a1' } })
+  await ready($, on, { profile: 'max' })
+  expect(await omni($, 'status')).toContain('astra consent: yes (set by max)')
+  const allowed: any = await $.agent.spawn({ prompt: 'p', description: 'd', subagentType: 'omniclaude:astra-expert' })
+  expect(allowed.deny).toBeUndefined()
+  expect(spawned.length).toBe(1)
+})
+
+test('/omni save <p> with no session override applies now', async ($, on) => {
+  const statuses = await ready($, on, {})
+  const saved = await omni($, 'save max')
+  expect(saved).toContain('OmniClaude max')
+  expect(saved).toContain('saved max: applies now (no session override) and in future sessions.')
+  expect(saved).toContain('This consent is cleared when you leave max.')
+  expect(saved).toContain('astra consent: yes (set by max)')
+  expect(statuses[statuses.length - 1]).toBe('omni:max · Fable parent; astra-expert allowed — may bill usage credits')
+  // leaving max by saving another profile takes the consent max set back
+  expect(await omni($, 'save quality')).toContain('astra consent: no')
+})
+
+test('/omni save <p> under a session override keeps the override', async ($, on) => {
   await ready($, on, {})
-  await omni($, 'max')
-  expect(await omni($, 'astra deny')).toContain('astra consent: yes (max profile)')
-  expect(await omni($, 'status')).toContain('astra consent: yes (max profile)')
-  expect(await omni($, 'economy')).toContain('astra consent: no')
+  await omni($, 'economy')
+  const saved = await omni($, 'save quality')
+  expect(saved).toContain('OmniClaude economy')
+  expect(saved).toContain('saved quality for future sessions (the session override economy stays until /omni reset).')
+  expect(saved).not.toContain('applies now')
+})
+
+test('/omni max after an explicit allow says the allow stays in force', async ($, on) => {
+  await ready($, on, {})
+  await omni($, 'astra allow')
+  const max = await omni($, 'max')
+  expect(max).toContain(' Fable may bill usage credits on some plans; your earlier /omni astra allow stays in force.')
+  expect(max).not.toContain('This consent is cleared when you leave max.')
+  expect(max).toContain('astra consent: yes')
+  expect(max).not.toContain('set by max')
+})
+
+test('a config option is used when nothing is saved', { options: { profile: 'quality' } }, async ($, on) => {
+  await ready($, on, {})
+  const text = await omni($, 'status')
+  expect(text).toContain('OmniClaude quality')
+  expect(text).toContain('(config option: quality)')
+})
+
+test('the saved profile wins over the config option', { options: { profile: 'quality' } }, async ($, on) => {
+  await ready($, on, { profile: 'economy' })
+  expect(await omni($, 'status')).toContain('OmniClaude economy')
+})
+
+test('OMNICLAUDE_PROFILE picks the profile over the config option, and the store wins over it', { options: { profile: 'quality' } }, async ($, on) => {
+  await ready($, on, {}, { OMNICLAUDE_PROFILE: 'economy' })
+  const text = await omni($, 'status')
+  expect(text).toContain('OmniClaude economy (env OMNICLAUDE_PROFILE: economy)')
+  await omni($, 'save balanced')
+  const saved = await omni($, 'status')
+  expect(saved).toContain('OmniClaude balanced')
+  expect(saved).not.toContain('(env ')
+})
+
+test('EVAL_OMNICLAUDE_PROFILE works the same way for plugin eval runs', { options: { profile: 'quality' } }, async ($, on) => {
+  await ready($, on, {}, { EVAL_OMNICLAUDE_PROFILE: 'balanced' })
+  expect(await omni($, 'status')).toContain('OmniClaude balanced (env EVAL_OMNICLAUDE_PROFILE: balanced)')
+})
+
+test('an environment value that is not a profile is ignored', async ($, on) => {
+  await ready($, on, {}, { OMNICLAUDE_PROFILE: 'turbo' })
+  const text = await omni($, 'status')
+  expect(text).toContain('OmniClaude auto')
+  expect(text).not.toContain('(env ')
+})
+
+test('the store wins over the environment', async ($, on) => {
+  await ready($, on, { profile: 'quality' }, { OMNICLAUDE_PROFILE: 'economy', EVAL_OMNICLAUDE_PROFILE: 'economy' })
+  const text = await omni($, 'status')
+  expect(text).toContain('OmniClaude quality')
+  expect(text).not.toContain('(env ')
+})
+
+test('session.start registers the /omni command', async ($, on) => {
+  const names: string[] = []
+  mock.store(on, {})
+  on('session.start', async (_$: any, e: any) => ({ cwd: e.cwd }))
+  on('command.register', async (_$: any, e: any) => { names.push(String(e.name)); return { value: { command: e.name } } })
+  on('ui.status', async () => ({ value: undefined }))
+  await $.session.start({ cwd: 'C:/CC/omniclaude', surface: null, isInteractive: false })
+  expect(names).toContain('omni')
 })
 
 test('only /omni max carries the warning', async ($, on) => {

@@ -2,8 +2,8 @@ import type { Register, EngineInterface } from 'claude-code'
 import type { LastClass, LastStep, Plan, Profile, Applied, Verified } from '../types'
 import { PROFILES, TIER_RANK, decideAutoModel, planForClass, spawnModel, tierOf } from './policy'
 import type { AutoClass, Effort, FixedProfile, Tier } from './policy'
-import { HELP, MAX_WARNING, doctorText, formatStatus, isProfile, parseOmni } from './omni'
-import type { OmniCommand } from './omni'
+import { HELP, MAX_WARNING, MAX_WARNING_KEPT, badge, doctorText, formatStatus, isProfile, parseOmni, saveNote } from './omni'
+import type { EnvProfile, OmniCommand } from './omni'
 
 // Each state ref is its own const: the validator reads literal { plugin, key } refs from the file that uses them, not object members or imports.
 const LAST_STEP = { plugin: 'omniclaude', key: 'lastStep' } as const
@@ -17,14 +17,31 @@ const LAST_CLASS = { plugin: 'omniclaude', key: 'lastClass' } as const
 
 const ASTRA = 'omniclaude:astra-expert'
 const ASTRA_DENY = 'astra-expert needs your agreement: run /omni astra allow'
-const MAX_STATUS = 'omni:max · Fable parent; astra-expert allowed — may bill usage credits'
 
-/** The session override, else the saved profile, else the config option, else auto. */
+/** OMNICLAUDE_PROFILE, else EVAL_OMNICLAUDE_PROFILE (what a `plugin eval` child inherits); a value that is no profile, or a read that fails, counts as unset. */
+async function envProfile($: EngineInterface): Promise<EnvProfile | undefined> {
+  try {
+    const plain = await $.env.get('OMNICLAUDE_PROFILE')
+    if (isProfile(plain)) return { name: 'OMNICLAUDE_PROFILE', profile: plain }
+    const evalled = await $.env.get('EVAL_OMNICLAUDE_PROFILE')
+    if (isProfile(evalled)) return { name: 'EVAL_OMNICLAUDE_PROFILE', profile: evalled }
+  } catch {
+    // no environment reading: fall through to the config option
+  }
+  return undefined
+}
+
+/**
+ * The session override, else the saved profile, else the environment, else the config option, else auto.
+ * The environment wins over the option because the engine always fills the option's manifest default (`auto`).
+ */
 export async function resolveProfile($: EngineInterface, optionProfile: unknown): Promise<Profile> {
   const { value: override } = await $.state.get(PROFILE_OVERRIDE)
   if (isProfile(override)) return override
   const saved = await $.store.get('profile')
   if (isProfile(saved)) return saved
+  const env = await envProfile($)
+  if (env) return env.profile
   return isProfile(optionProfile) ? optionProfile : 'auto'
 }
 
@@ -65,12 +82,31 @@ async function contextTokens($: EngineInterface): Promise<number> {
   }
 }
 
-/** Consent that `/omni max` gave goes away when the override leaves max; an explicit `/omni astra allow` stays. */
+/** Consent that max gave goes away when the effective profile leaves max; an explicit `/omni astra allow` stays. */
 async function dropMaxConsent($: EngineInterface): Promise<void> {
   const { value: fromMax } = await $.state.get(ASTRA_CONSENT_FROM_MAX)
-  if (!fromMax) return
+  if (fromMax !== true) return
   await $.state.set(ASTRA_CONSENT, false)
   await $.state.set(ASTRA_CONSENT_FROM_MAX, false)
+}
+
+/** Max grants the astra consent, tagged as max's; an explicit allow already on stays explicit. Returns the warning to show. */
+async function grantMaxConsent($: EngineInterface): Promise<string> {
+  const { value: consent } = await $.state.get(ASTRA_CONSENT)
+  const { value: fromMax } = await $.state.get(ASTRA_CONSENT_FROM_MAX)
+  if (consent === true && fromMax !== true) return MAX_WARNING_KEPT
+  await $.state.set(ASTRA_CONSENT, true)
+  await $.state.set(ASTRA_CONSENT_FROM_MAX, true)
+  return MAX_WARNING
+}
+
+/** After set/save/reset: entering max (or asking for it) grants its consent with a warning; any other profile takes max's consent back. */
+async function afterSwitch($: EngineInterface, ctx: OmniContext, askedMax: boolean, note: string): Promise<string> {
+  const after = await resolveProfile($, ctx.optionProfile)
+  let warning = ''
+  if (after !== 'max') await dropMaxConsent($)
+  else if (askedMax || ctx.before !== 'max') warning = await grantMaxConsent($)
+  return (await statusText($, ctx.optionProfile)) + note + warning
 }
 
 async function statusText($: EngineInterface, optionProfile: unknown): Promise<string> {
@@ -82,38 +118,32 @@ async function statusText($: EngineInterface, optionProfile: unknown): Promise<s
   const { value: verified } = await $.state.get(VERIFIED)
   const { value: lastClass } = await $.state.get(LAST_CLASS)
   const { value: consent } = await $.state.get(ASTRA_CONSENT)
+  const { value: fromMax } = await $.state.get(ASTRA_CONSENT_FROM_MAX)
   const effective = await resolveProfile($, optionProfile)
-  return formatStatus({ effective, saved, optionProfile, override, plan, last, applied, verified, lastClass, consent: Boolean(consent) })
+  const env = await envProfile($)
+  return formatStatus({
+    effective, saved, optionProfile, override, env, plan, last, applied, verified, lastClass,
+    consent: consent === true, consentFromMax: fromMax === true,
+  })
 }
 
-export async function runOmni($: EngineInterface, cmd: OmniCommand, ctx: { optionProfile: unknown; version: string }): Promise<string> {
+type OmniContext = { optionProfile: unknown; version: string; before: Profile }
+
+export async function runOmni($: EngineInterface, cmd: OmniCommand, ctx: OmniContext): Promise<string> {
   switch (cmd.kind) {
     case 'status':
       return statusText($, ctx.optionProfile)
-    case 'set': {
+    case 'set':
       await $.state.set(PROFILE_OVERRIDE, cmd.profile)
-      let note = ''
-      if (cmd.profile === 'max') {
-        // Only consent that max itself grants is tagged as max's; an earlier explicit allow stays explicit.
-        const { value: consented } = await $.state.get(ASTRA_CONSENT)
-        if (!consented) {
-          await $.state.set(ASTRA_CONSENT, true)
-          await $.state.set(ASTRA_CONSENT_FROM_MAX, true)
-        }
-        note = MAX_WARNING
-      } else {
-        await dropMaxConsent($)
-      }
-      return (await statusText($, ctx.optionProfile)) + note
-    }
-    case 'save':
+      return afterSwitch($, ctx, cmd.profile === 'max', '')
+    case 'save': {
+      const { value: override } = await $.state.get(PROFILE_OVERRIDE)
       await $.store.set('profile', cmd.profile)
-      return (await statusText($, ctx.optionProfile)) + `
-  saved ${cmd.profile} for future sessions.`
+      return afterSwitch($, ctx, false, saveNote(cmd.profile, override))
+    }
     case 'reset':
       await $.state.set(PROFILE_OVERRIDE, null)
-      await dropMaxConsent($)
-      return statusText($, ctx.optionProfile)
+      return afterSwitch($, ctx, false, '')
     case 'astra':
       await $.state.set(ASTRA_CONSENT, cmd.allow)
       await $.state.set(ASTRA_CONSENT_FROM_MAX, false)
@@ -135,15 +165,18 @@ export const register: Register = (on, options) => {
       argumentHint: 'status | economy | balanced | quality | max | auto | save <profile> | reset | astra allow|deny | doctor',
     })
     const profile = await resolveProfile($, optionProfile)
-    $.ui.status(profile === 'max' ? MAX_STATUS : `omni:${profile}`)
+    // A session that starts on max has max's consent, as /omni max gives it; the badge of any other profile ignores consent.
+    if (profile === 'max') await grantMaxConsent($)
+    $.ui.status(badge(profile, true))
     return next(e)
   })
 
   on('command.run', { command: 'omni' }, async ($, e) => {
     const version = (await $.session.version()).version
-    const text = await runOmni($, parseOmni(e.args), { optionProfile, version })
-    const profile = await resolveProfile($, optionProfile)
-    $.ui.status(`omni:${profile}`)
+    const before = await resolveProfile($, optionProfile)
+    const text = await runOmni($, parseOmni(e.args), { optionProfile, version, before })
+    const { value: consent } = await $.state.get(ASTRA_CONSENT)
+    $.ui.status(badge(await resolveProfile($, optionProfile), consent === true))
     return { text }
   })
 
@@ -192,11 +225,10 @@ export const register: Register = (on, options) => {
   })
 
   on('agent.spawn', async ($, e, next) => {
-    // The consent gate comes first: a teammate or workflow agent of this type must not slip past it (a fork's type is `fork`).
+    // The consent gate comes first and reads only the flag (max sets it): a teammate or workflow agent of this type must not slip past it (a fork's type is `fork`).
     if (e.subagentType === ASTRA) {
-      const profile = await resolveProfile($, optionProfile)
       const { value: consent } = await $.state.get(ASTRA_CONSENT)
-      if (!consent && profile !== 'max') return { deny: ASTRA_DENY }
+      if (consent !== true) return { deny: ASTRA_DENY }
     }
     if (e.fork || e.isTeammate || e.workflow) return next(e)
     const profile = await resolveProfile($, optionProfile)

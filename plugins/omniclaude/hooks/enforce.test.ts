@@ -93,7 +93,7 @@ test('astra-expert is denied without consent', async ($, on) => {
   expect(spawned.length).toBe(0)
 })
 
-test('astra-expert is allowed under the max profile (the explicit allow flag is Task 4)', async ($, on) => {
+test('astra-expert is allowed when the session starts on max (max sets the consent flag)', async ($, on) => {
   const spawned: any[] = []
   on('agent.spawn', async (_$, e) => { spawned.push(e); return { model: e.model ?? 'inherit', agentId: 'a1' } })
   await ready($, on, 'max')

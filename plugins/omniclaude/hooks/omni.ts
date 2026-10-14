@@ -36,7 +36,29 @@ export const HELP = [
   '            /omni save <profile> | reset | astra allow|deny | doctor',
 ].join('\n')
 
-export const MAX_WARNING = '\n  warning: max runs the parent on Fable and allows astra-expert; Fable may bill usage credits on some plans. This consent is cleared when you leave max.'
+const MAX_WARNING_HEAD = '\n  warning: max runs the parent on Fable and allows astra-expert;'
+export const MAX_WARNING = `${MAX_WARNING_HEAD} Fable may bill usage credits on some plans. This consent is cleared when you leave max.`
+/** Entering max when an explicit `/omni astra allow` is already on: max did not grant it, so leaving max will not clear it. */
+export const MAX_WARNING_KEPT = `${MAX_WARNING_HEAD} Fable may bill usage credits on some plans; your earlier /omni astra allow stays in force.`
+
+export const MAX_STATUS = 'omni:max · Fable parent; astra-expert allowed — may bill usage credits'
+const MAX_STATUS_NO_ASTRA = 'omni:max · Fable parent — may bill usage credits; astra-expert needs /omni astra allow'
+
+/** The short badge `/omni` and session.start draw; max says whether astra-expert is allowed right now. */
+export function badge(profile: Profile, consent: boolean): string {
+  if (profile !== 'max') return `omni:${profile}`
+  return consent ? MAX_STATUS : MAX_STATUS_NO_ASTRA
+}
+
+/** The `/omni save` suffix: the saved profile applies now only when no session override stands in front of it. */
+export function saveNote(profile: Profile, override: unknown): string {
+  return isProfile(override)
+    ? `\n  saved ${profile} for future sessions (the session override ${override} stays until /omni reset).`
+    : `\n  saved ${profile}: applies now (no session override) and in future sessions.`
+}
+
+/** A profile named by an environment variable (OMNICLAUDE_PROFILE, or EVAL_OMNICLAUDE_PROFILE in a `plugin eval` child). */
+export type EnvProfile = { name: string; profile: Profile }
 
 /** What `/omni status` shows, read from the store and the plugin state by the caller. */
 export type StatusView = {
@@ -44,20 +66,24 @@ export type StatusView = {
   saved: unknown
   optionProfile: unknown
   override: unknown
+  env: EnvProfile | undefined
   plan: Plan | null | undefined
   last: LastStep | null | undefined
   applied: Applied | null | undefined
   verified: Verified | null | undefined
   lastClass: LastClass | null | undefined
   consent: boolean
+  consentFromMax: boolean
 }
 
 export function formatStatus(v: StatusView): string {
   const parent = v.effective === 'auto'
     ? (v.plan ? `${v.plan.model}/${v.plan.effort} (auto: ${v.plan.reason})` : 'opus/medium (auto, not classified yet)')
     : `${PROFILES[v.effective].parent.model}/${PROFILES[v.effective].parent.effort}`
+  // The environment applies only when neither a session override nor a saved profile stands in front of it.
+  const fromEnv = v.env && !isProfile(v.override) && !isProfile(v.saved) ? ` (env ${v.env.name}: ${v.env.profile})` : ''
   return [
-    `OmniClaude ${v.effective}`,
+    `OmniClaude ${v.effective}${fromEnv}`,
     `  saved profile: ${isProfile(v.saved) ? v.saved : 'none'}${isProfile(v.optionProfile) ? ` (config option: ${v.optionProfile})` : ''}`,
     `  session override: ${isProfile(v.override) ? v.override : 'none'}`,
     `  requested parent: ${parent}`,
@@ -65,7 +91,7 @@ export function formatStatus(v: StatusView): string {
     `  engine requested (last step): ${v.last ? `${v.last.model}/${String(v.last.effort ?? 'default')}` : 'none yet'}`,
     `  applied (last step): ${v.applied ? `${v.applied.model}/${String(v.applied.effort ?? 'default')}` : 'none yet'}`,
     `  verified (last turn, API-reported): ${v.verified ? v.verified.model : 'none yet'}`,
-    `  astra consent: ${v.effective === 'max' ? 'yes (max profile)' : v.consent ? 'yes' : 'no'}`,
+    `  astra consent: ${v.consent ? (v.consentFromMax ? 'yes (set by max)' : 'yes') : 'no'}`,
   ].join('\n')
 }
 

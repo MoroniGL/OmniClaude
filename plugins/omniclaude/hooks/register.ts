@@ -10,6 +10,7 @@ const LAST_STEP = { plugin: 'omniclaude', key: 'lastStep' } as const
 const PROFILE_OVERRIDE = { plugin: 'omniclaude', key: 'profileOverride' } as const
 const PLAN = { plugin: 'omniclaude', key: 'plan' } as const
 const ASTRA_CONSENT = { plugin: 'omniclaude', key: 'astraConsent' } as const
+const ASTRA_CONSENT_FROM_MAX = { plugin: 'omniclaude', key: 'astraConsentFromMax' } as const
 const APPLIED = { plugin: 'omniclaude', key: 'applied' } as const
 const VERIFIED = { plugin: 'omniclaude', key: 'verified' } as const
 
@@ -38,6 +39,14 @@ export async function parentTarget($: EngineInterface, profile: Profile): Promis
   return plan ? { model: plan.model, effort: plan.effort } : PROFILES.balanced.parent
 }
 
+/** Consent that `/omni max` gave goes away when the override leaves max; an explicit `/omni astra allow` stays. */
+async function dropMaxConsent($: EngineInterface): Promise<void> {
+  const { value: fromMax } = await $.state.get(ASTRA_CONSENT_FROM_MAX)
+  if (!fromMax) return
+  await $.state.set(ASTRA_CONSENT, false)
+  await $.state.set(ASTRA_CONSENT_FROM_MAX, false)
+}
+
 async function statusText($: EngineInterface, optionProfile: unknown): Promise<string> {
   const saved = await $.store.get('profile')
   const { value: override } = await $.state.get(PROFILE_OVERRIDE)
@@ -58,8 +67,15 @@ export async function runOmni($: EngineInterface, cmd: OmniCommand, ctx: { optio
       await $.state.set(PROFILE_OVERRIDE, cmd.profile)
       let note = ''
       if (cmd.profile === 'max') {
-        await $.state.set(ASTRA_CONSENT, true)
+        // Only consent that max itself grants is tagged as max's; an earlier explicit allow stays explicit.
+        const { value: consented } = await $.state.get(ASTRA_CONSENT)
+        if (!consented) {
+          await $.state.set(ASTRA_CONSENT, true)
+          await $.state.set(ASTRA_CONSENT_FROM_MAX, true)
+        }
         note = MAX_WARNING
+      } else {
+        await dropMaxConsent($)
       }
       return (await statusText($, ctx.optionProfile)) + note
     }
@@ -69,9 +85,11 @@ export async function runOmni($: EngineInterface, cmd: OmniCommand, ctx: { optio
   saved ${cmd.profile} for future sessions.`
     case 'reset':
       await $.state.set(PROFILE_OVERRIDE, null)
+      await dropMaxConsent($)
       return statusText($, ctx.optionProfile)
     case 'astra':
       await $.state.set(ASTRA_CONSENT, cmd.allow)
+      await $.state.set(ASTRA_CONSENT_FROM_MAX, false)
       return statusText($, ctx.optionProfile)
     case 'doctor':
       return doctorText(ctx.version)

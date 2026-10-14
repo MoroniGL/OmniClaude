@@ -14,6 +14,7 @@ declare module 'claude-code' {
       profileOverride: Profile | null
       plan: Plan | null
       astraConsent: boolean
+      astraConsentFromMax: boolean
       applied: Applied | null
       verified: Verified | null
     }

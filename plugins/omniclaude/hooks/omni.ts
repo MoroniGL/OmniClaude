@@ -36,7 +36,7 @@ export const HELP = [
   '            /omni save <profile> | reset | astra allow|deny | doctor',
 ].join('\n')
 
-export const MAX_WARNING = '\n  warning: max runs the parent on Fable and allows astra-expert; Fable may bill usage credits on some plans.'
+export const MAX_WARNING = '\n  warning: max runs the parent on Fable and allows astra-expert; Fable may bill usage credits on some plans. This consent is cleared when you leave max.'
 
 /** What `/omni status` shows, read from the store and the plugin state by the caller. */
 export type StatusView = {
@@ -63,7 +63,7 @@ export function formatStatus(v: StatusView): string {
     `  engine requested (last step): ${v.last ? `${v.last.model}/${String(v.last.effort ?? 'default')}` : 'none yet'}`,
     `  applied (last step): ${v.applied ? `${v.applied.model}/${String(v.applied.effort ?? 'default')}` : 'none yet'}`,
     `  verified (last turn, API-reported): ${v.verified ? v.verified.model : 'none yet'}`,
-    `  astra consent: ${v.consent ? 'yes' : 'no'}`,
+    `  astra consent: ${v.effective === 'max' ? 'yes (max profile)' : v.consent ? 'yes' : 'no'}`,
   ].join('\n')
 }
 

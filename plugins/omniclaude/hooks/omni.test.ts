@@ -115,6 +115,50 @@ test('/omni max sets consent and warns that Fable may bill usage credits', async
   expect(await omni($, 'status')).toContain('astra consent: yes')
 })
 
+test('consent set by /omni max is cleared when you leave max', async ($, on) => {
+  const spawned: any[] = []
+  on('agent.spawn', async (_$, e) => { spawned.push(e); return { model: e.model ?? 'inherit', agentId: 'a1' } })
+  await ready($, on, {})
+  expect(await omni($, 'max')).toContain('This consent is cleared when you leave max.')
+  expect(await omni($, 'economy')).toContain('astra consent: no')
+  expect(await omni($, 'status')).toContain('astra consent: no')
+  // the spawn gate follows: a plain astra-expert spawn is denied again outside max
+  const denied: any = await $.agent.spawn({ prompt: 'p', description: 'd', subagentType: 'omniclaude:astra-expert' })
+  expect(denied.deny).toBe(ASTRA_DENY)
+  expect(spawned.length).toBe(0)
+})
+
+test('/omni reset also clears consent that /omni max set', async ($, on) => {
+  await ready($, on, {})
+  expect(await omni($, 'max')).toContain('astra consent: yes')
+  expect(await omni($, 'reset')).toContain('astra consent: no')
+})
+
+test('explicit /omni astra allow survives leaving max', async ($, on) => {
+  await ready($, on, {})
+  await omni($, 'astra allow')
+  await omni($, 'max')
+  expect(await omni($, 'economy')).toContain('astra consent: yes')
+  // /omni max did not take over the explicit allow, so reset keeps it too
+  await omni($, 'max')
+  expect(await omni($, 'reset')).toContain('astra consent: yes')
+})
+
+test('an /omni astra allow given while on max makes the consent explicit', async ($, on) => {
+  await ready($, on, {})
+  await omni($, 'max')
+  await omni($, 'astra allow')
+  expect(await omni($, 'quality')).toContain('astra consent: yes')
+})
+
+test('under max the status shows the max consent, even after a deny', async ($, on) => {
+  await ready($, on, {})
+  await omni($, 'max')
+  expect(await omni($, 'astra deny')).toContain('astra consent: yes (max profile)')
+  expect(await omni($, 'status')).toContain('astra consent: yes (max profile)')
+  expect(await omni($, 'economy')).toContain('astra consent: no')
+})
+
 test('only /omni max carries the warning', async ($, on) => {
   await ready($, on, {})
   expect(await omni($, 'quality')).not.toContain('usage credits')

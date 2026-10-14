@@ -1,7 +1,7 @@
 import type { Register, EngineInterface } from 'claude-code'
-import type { LastStep, Profile, Applied, Verified } from '../types'
-import { PROFILES, spawnModel, tierOf } from './policy'
-import type { Effort, FixedProfile, Tier } from './policy'
+import type { LastStep, Plan, Profile, Applied, Verified } from '../types'
+import { PROFILES, decideAutoModel, planForClass, spawnModel, tierOf } from './policy'
+import type { AutoClass, Effort, FixedProfile, Tier } from './policy'
 import { HELP, MAX_WARNING, doctorText, formatStatus, isProfile, parseOmni } from './omni'
 import type { OmniCommand } from './omni'
 
@@ -37,6 +37,27 @@ export async function parentTarget($: EngineInterface, profile: Profile): Promis
   if (profile !== 'auto') return PROFILES[profile].parent
   const { value: plan } = await $.state.get(PLAN)
   return plan ? { model: plan.model, effort: plan.effort } : PROFILES.balanced.parent
+}
+
+const AUTO_LABELS = ['trivial', 'routine', 'complex', 'critical'] as const
+
+/** The class the small model names for a prompt; undefined when it names none of the four labels or the request fails. */
+export async function classifyPrompt($: EngineInterface, text: string): Promise<AutoClass | undefined> {
+  try {
+    const label = await $.model.classify(text.slice(0, 4000), AUTO_LABELS)
+    return (AUTO_LABELS as readonly (string | undefined)[]).includes(label) ? (label as AutoClass) : undefined
+  } catch {
+    return undefined
+  }
+}
+
+/** Tokens in the live context window. A reading that fails counts as 0: the cheap re-cache assumption, so auto may still upgrade. */
+async function contextTokens($: EngineInterface): Promise<number> {
+  try {
+    return (await $.session.usage()).context.tokens ?? 0
+  } catch {
+    return 0
+  }
 }
 
 /** Consent that `/omni max` gave goes away when the override leaves max; an explicit `/omni astra allow` stays. */
@@ -118,6 +139,24 @@ export const register: Register = (on, options) => {
     const profile = await resolveProfile($, optionProfile)
     $.ui.status(`omni:${profile}`)
     return { text }
+  })
+
+  on('prompt.submit', async ($, e, next) => {
+    // Only the person's own prompt is classified; a notification, a peer or another plugin's prompt leaves the plan alone.
+    if (e.origin.kind !== 'composer') return next(e)
+    if ((await resolveProfile($, optionProfile)) !== 'auto') return next(e)
+    const klass = await classifyPrompt($, e.text)
+    if (klass === undefined) {
+      $.ui.status('omni:auto · classifier gave no label; plan kept')
+      return next(e)
+    }
+    const wish = planForClass(klass)
+    const { value: previous } = await $.state.get(PLAN)
+    const decided = decideAutoModel(previous ? previous.model : null, wish.model, await contextTokens($))
+    const plan: Plan = { model: decided.model, effort: wish.effort, source: 'auto', reason: `${klass}: ${decided.reason}` }
+    await $.state.set(PLAN, plan)
+    $.ui.status(`omni:auto · ${klass} → ${plan.model}/${plan.effort}`)
+    return next(e)
   })
 
   on('turn.step', async function* ($, e, next) {

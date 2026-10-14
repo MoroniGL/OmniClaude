@@ -1,7 +1,7 @@
 import { test, expect } from 'claude-code/testing'
 import {
   PROFILES, WORKER_TIERS, tierOf, clampWorkerModel, spawnModel,
-  planForClass, decideAutoModel, AUTO_UPGRADE_CONTEXT_LIMIT,
+  planForClass, decideAutoModel,
 } from './policy'
 
 test('profile table matches the spec', async () => {
@@ -11,13 +11,18 @@ test('profile table matches the spec', async () => {
   expect(PROFILES.max).toEqual({ parent: { model: 'fable', effort: 'high' }, explore: 'opus', general: 'opus' })
 })
 
-test('tierOf understands aliases and full ids', async () => {
+test('tierOf understands aliases, full ids and [1m] suffixes', async () => {
   expect(tierOf('haiku')).toBe('haiku')
   expect(tierOf('claude-haiku-5-5')).toBe('haiku')
   expect(tierOf('claude-opus-5-5')).toBe('opus')
   expect(tierOf('claude-fable-5-1')).toBe('fable')
   expect(tierOf('claude-sonnet-5-5-20261001')).toBe('sonnet')
   expect(tierOf('gpt-6')).toBeUndefined()
+  expect(tierOf('opus[1m]')).toBe('opus')
+  expect(tierOf('sonnet[1m]')).toBe('sonnet')
+  expect(tierOf('claude-opus-5-5[1m]')).toBe('opus')
+  expect(tierOf('opusplan')).toBeUndefined()
+  expect(tierOf('inherit')).toBeUndefined()
 })
 
 test('worker tiers are the shipped frontmatter tiers', async () => {
@@ -33,6 +38,11 @@ test('clampWorkerModel clamps a higher request back to the tier, except under ma
   expect(clampWorkerModel('sonnet', 'haiku', 'balanced')).toBe('haiku')
   expect(clampWorkerModel('sonnet', undefined, 'balanced')).toBeUndefined()
   expect(clampWorkerModel('haiku', 'opus', 'max')).toBe('opus')
+  expect(clampWorkerModel('fable', 'opus[1m]', 'balanced')).toBe('opus[1m]')
+  expect(clampWorkerModel('fable', 'sonnet', 'balanced')).toBe('sonnet')
+  expect(clampWorkerModel('fable', 'fable', 'balanced')).toBe('fable')
+  expect(clampWorkerModel('haiku', 'inherit', 'balanced')).toBe('haiku')
+  expect(clampWorkerModel('haiku', undefined, 'max')).toBeUndefined()
 })
 
 test('spawnModel routes built-ins and model-less agents by profile', async () => {
@@ -40,9 +50,14 @@ test('spawnModel routes built-ins and model-less agents by profile', async () =>
   expect(spawnModel('balanced', 'Explore', undefined, undefined)).toBe('sonnet')
   expect(spawnModel('quality', 'general-purpose', undefined, undefined)).toBe('opus')
   expect(spawnModel('balanced', 'Plan', undefined, undefined)).toBe('sonnet')
+  expect(spawnModel('economy', 'Plan', undefined, undefined)).toBe('sonnet')
+  expect(spawnModel('quality', 'Plan', undefined, undefined)).toBe('opus')
+  expect(spawnModel('economy', 'Explore', undefined, 'opus')).toBe('haiku')
+  expect(spawnModel('economy', 'general-purpose', undefined, 'haiku')).toBe('haiku')
+  expect(spawnModel('max', 'Explore', undefined, 'fable')).toBe('fable')
   expect(spawnModel('balanced', 'omniclaude:luna-researcher', 'haiku', 'opus')).toBe('haiku')
   expect(spawnModel('balanced', 'omniclaude:terra-explorer', 'sonnet', undefined)).toBeUndefined()
-  expect(spawnModel('balanced', 'some-plugin:writer', 'opus', undefined)).toBeUndefined()
+  expect(spawnModel('balanced', 'some-plugin:writer', 'opus', undefined)).toBe('sonnet')
   expect(spawnModel('balanced', 'some-plugin:writer', undefined, undefined)).toBe('sonnet')
 })
 
@@ -56,7 +71,7 @@ test('planForClass maps the four classes', async () => {
 test('decideAutoModel applies the cache rule', async () => {
   expect(decideAutoModel(null, 'sonnet', 0)).toEqual({ model: 'sonnet', reason: 'first prompt' })
   expect(decideAutoModel('sonnet', 'opus', 10_000)).toEqual({ model: 'opus', reason: 'upgraded (context 10000 < 40000)' })
-  expect(decideAutoModel('sonnet', 'opus', AUTO_UPGRADE_CONTEXT_LIMIT)).toEqual({ model: 'sonnet', reason: 'kept sonnet to preserve the cache' })
+  expect(decideAutoModel('sonnet', 'opus', 40_000)).toEqual({ model: 'sonnet', reason: 'kept sonnet to preserve the cache' })
   expect(decideAutoModel('opus', 'sonnet', 5_000)).toEqual({ model: 'opus', reason: 'never downgraded mid-session' })
   expect(decideAutoModel('opus', 'opus', 90_000)).toEqual({ model: 'opus', reason: 'unchanged' })
 })

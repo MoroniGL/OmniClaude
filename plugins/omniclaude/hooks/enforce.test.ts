@@ -262,6 +262,26 @@ test('a main-loop step whose hook fails goes on unchanged and says so', async ($
   expect(statuses[statuses.length - 1]).toBe('omni:? · not applied (hook error)')
 })
 
+test('a step whose hook fails leaves no applied record from an earlier step', async ($, on) => {
+  let storeDown = false
+  const statuses: string[] = []
+  // A store of our own (not mock.store) so the test can make it fail between steps.
+  on('store.get', async () => (storeDown ? { deny: 'store unavailable' } : { value: 'balanced' }))
+  on('session.start', async (_$: any, e: any) => ({ cwd: e.cwd }))
+  on('command.register', async (_$: any, e: any) => ({ value: { command: e.name } }))
+  on('session.version', async () => ({ value: { version: '2.1.295' } }))
+  on('ui.status', async (_$: any, e: any) => { statuses.push(String(e.text)); return { value: undefined } })
+  on('turn.step', async function* (_$, e) { return STEP_RESULT(e) })
+  await $.session.start({ cwd: 'C:/CC/omniclaude', surface: null, isInteractive: false })
+  await drain($.turn.step(STEP('claude-sonnet-5-5', 'high')))
+  expect(await status($)).toContain('applied (last step): opus/medium')
+  storeDown = true
+  await drain($.turn.step(STEP('claude-sonnet-5-5', 'high')))
+  expect(statuses[statuses.length - 1]).toBe('omni:? · not applied (hook error)')
+  storeDown = false
+  expect(await status($)).toContain('applied (last step): none yet')
+})
+
 const ENGINE = { plugin: 'engine', tier: 'core' }
 
 test('engine built-ins other than Explore, Plan and general-purpose keep their own model', async ($, on) => {

@@ -21,6 +21,8 @@ test('tierOf understands aliases, full ids and [1m] suffixes', async () => {
   expect(tierOf('opus[1m]')).toBe('opus')
   expect(tierOf('sonnet[1m]')).toBe('sonnet')
   expect(tierOf('claude-opus-5-5[1m]')).toBe('opus')
+  expect(tierOf('opus [1m]')).toBe('opus')
+  expect(tierOf(' claude-sonnet-5-5 [1m] ')).toBe('sonnet')
   expect(tierOf('opusplan')).toBeUndefined()
   expect(tierOf('inherit')).toBeUndefined()
 })

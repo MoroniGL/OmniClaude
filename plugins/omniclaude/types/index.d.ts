@@ -9,8 +9,9 @@ export type Applied = { model: string; effort?: string | number; profile: Profil
 export type Verified = { model: string }
 // The last subagent spawn the mod decided: `model` is the string it sent, or null when it passed the spawn through unchanged.
 export type LastSpawn = { subagentType: string; model: string | null }
-// `label` is one of the four auto classes, `none` (the classifier named no label) or `error` (its request failed).
-export type LastClass = { label: string; reason: string }
+export type AutoClass = 'trivial' | 'routine' | 'complex' | 'critical'
+// `label` is one of the four auto classes, `none` (the classifier named no label) or `error` (its request failed or timed out).
+export type LastClass = { label: AutoClass | 'none' | 'error'; reason: string }
 
 declare module 'claude-code' {
   interface PluginState {

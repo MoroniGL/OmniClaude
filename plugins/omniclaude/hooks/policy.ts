@@ -44,7 +44,8 @@ export function missedClass(miss: ClassifierMiss): { label: 'none' | 'error'; re
 }
 
 export function tierOf(model: string): Tier | undefined {
-  const m = model.trim().toLowerCase().replace(/\[[^\]]*\]$/, '')
+  // Trim again after the suffix goes: `opus [1m]` is opus.
+  const m = model.trim().toLowerCase().replace(/\[[^\]]*\]$/, '').trim()
   for (const tier of ['haiku', 'sonnet', 'opus', 'fable'] as const) {
     if (m === tier || m.includes(`-${tier}-`) || m.startsWith(`${tier}-`) || m.endsWith(`-${tier}`)) return tier
   }

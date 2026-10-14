@@ -50,6 +50,7 @@ test('/omni status reports saved, override, parent, applied, verified and consen
   expect(text).toContain('applied (last step): none yet')
   expect(text).toContain('verified (last turn, API-reported): none yet')
   expect(text).toContain('astra consent: no')
+  expect(text).toContain('mod version: 0.2.0-alpha.1')
 })
 
 test('/omni with no arguments is /omni status', async ($, on) => {
@@ -311,6 +312,8 @@ test('/omni doctor names the hooks, the engine and the kill switches', async ($,
   const text = await omni($, 'doctor')
   expect(text).toContain('turn.step')
   expect(text).toContain('agent.spawn')
+  expect(text).toContain('prompt.submit (auto classifier)')
+  expect(text).toContain('prompt.compose (policy section)')
   expect(text).toContain('engine')
   expect(text).toContain('2.1.295')
   expect(text).toContain('if /omni is missing in a session, the mod is off (--bare, --safe-mode, disableAllHooks, allowManagedModsOnly, remote switch, engine < 2.1.287)')

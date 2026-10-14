@@ -238,6 +238,8 @@ export const register: Register = (on, options) => {
     } catch {
       // The step must still run: unchanged, and the badge says the profile was not applied to it.
       $.ui.status(`omni:${profile} · not applied (hook error)`)
+      // Nothing was applied to this step, so an earlier step's record must not stand for it (best effort).
+      await $.state.set(APPLIED, null).catch(() => undefined)
     }
     return yield* next(out)
   })

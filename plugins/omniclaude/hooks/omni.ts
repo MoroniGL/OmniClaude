@@ -5,6 +5,9 @@ import { PROFILES } from './policy'
 // (never across an import), and a state ref must be a literal const of the file that reads it, so every
 // `$` and `$.state` use lives in register.ts; this file parses commands and formats text.
 
+/** The mod's release version; a Python test keeps it equal to the repository's VERSION file. */
+export const MOD_VERSION = '0.2.0-alpha.1'
+
 export type OmniCommand =
   | { kind: 'status' }
   | { kind: 'set'; profile: Profile }
@@ -104,6 +107,7 @@ export function formatStatus(v: StatusView): string {
     `  verified (last turn, API-reported): ${v.verified ? v.verified.model : 'none yet'}`,
     `  last spawn: ${v.lastSpawn ? `${v.lastSpawn.subagentType} → ${v.lastSpawn.model ?? 'unchanged'}` : 'none yet'}`,
     `  astra consent: ${v.consent ? (v.consentFromMax ? 'yes (set by max)' : 'yes') : 'no'}`,
+    `  mod version: ${MOD_VERSION}`,
   ].join('\n')
 }
 
@@ -111,7 +115,7 @@ export function doctorText(version: string): string {
   return [
     'OmniClaude doctor',
     `  engine: ${version}`,
-    '  hooks: session.start, command.run, turn.step (main loop model/effort), agent.spawn (tiers, astra consent), turn.complete (verified)',
+    '  hooks: session.start, command.run, prompt.submit (auto classifier), turn.step (main loop model/effort), agent.spawn (tiers, astra consent), prompt.compose (policy section), turn.complete (verified)',
     '  if /omni is missing in a session, the mod is off (--bare, --safe-mode, disableAllHooks, allowManagedModsOnly, remote switch, engine < 2.1.287); Stage 1 skill and agents still work.',
   ].join('\n')
 }

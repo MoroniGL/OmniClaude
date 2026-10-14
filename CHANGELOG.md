@@ -15,7 +15,9 @@
 - Profile order: the session override, the saved profile (the plugin's own store; `/omni save` applies now when no override stands in front of it), `OMNICLAUDE_PROFILE` else `EVAL_OMNICLAUDE_PROFILE` (for headless and `plugin eval` runs, whose prompts `auto` does not classify), the `/config` picker "Routing profile" (`userConfig.profile`), then `auto`.
 - Eval cases gain two indicators, `agent-used` and `skill-fired` (`tool_used`, `min: 0`, with-plugin arm), so delegation and skill use are counted in every case.
 - Stage 1 `setup.py`/persisted-settings plans dropped: the plugin's own store replaces them.
-- Known: alias acceptance in `turn.step` (strings such as `opus` or `sonnet[1m]`) and the Stage 2 measurement are not yet live-verified. No savings claim.
+- Fix from the first live run: the engine rejects aliases in `turn.step` (`unrecognized_model`), so the mod sends full model ids (`claude-sonnet-5-5` and so on). Live-verified 2026-10-14: under `economy` the parent ran on `claude-sonnet-5-5` and an Explore subagent on `claude-haiku-5-5`.
+- Stage 2 measurement (4 synthetic cases, 3 runs per arm, Opus 5.5 baseline; docs/local-validation.md): `economy` cut cost 24% to 47% per run and `balanced` raised it 10% to 61%, with identical grader scores (1.00, the ceiling) and zero delegation in all runs. The saving comes from the enforced Sonnet parent, not from delegation. Not a savings guarantee.
+- Stage 3 ideas recorded: subagent model verification, bare `astra-expert` gating, advisor measurement.
 
 ## 0.1.0-alpha.1 — Stage 1 (core), experimental
 

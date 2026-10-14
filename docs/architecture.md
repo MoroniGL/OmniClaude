@@ -40,7 +40,7 @@ Live-verified on 2026-10-14 (engine 2.1.295, headless runs): the engine rejects 
 
 ## Delivery
 - Stage 1: agents, skill, CLI profile files, eval suite. No hooks.
-- Stage 2 (this release, experimental): the mod, `/omni`, the saved profile in the plugin's own store (replacing the planned `setup.py` and persisted settings), and eval indicators for delegation and skill use. The Stage 2 measurement has not been run.
+- Stage 2 (this release, experimental): the mod, `/omni`, the saved profile in the plugin's own store (replacing the planned `setup.py` and persisted settings), and eval indicators for delegation and skill use. The Stage 2 measurement is recorded in `docs/local-validation.md`: `economy` cut cost 24% to 47% per run and `balanced` raised it 10% to 61%, with identical scores and zero delegation.
 - Phase 2: Gemini context offload.
 
 ## Safety invariant

@@ -81,7 +81,9 @@ Two bounded tasks were dispatched from the parent, a Fable 5.1 session:
 - Because of this, the headless `-p` delegation test did not run.
 - The user chose to log the engine in (`claude.exe auth login`). On 2026-10-14 the user logged the standalone engine in (`claude.exe auth status` → `loggedIn: true`, `authMethod: claude.ai`); the eval below ran with that login.
 
-## Acceptance status (spec §8.3)
+## Acceptance status
+
+The first four rows are the Stage 1 criteria (spec §8.3). The last four are the Stage 2 live acceptance items 7 to 9 (Stage 2 spec §9), recorded under Stage 2 live checks below.
 
 | Criterion | Status | Evidence |
 |---|---|---|
@@ -90,6 +92,10 @@ Two bounded tasks were dispatched from the parent, a Fable 5.1 session:
 | /tasks and transcript show requested model and effort | partial | model verified from both worker transcripts; effort not observed; /tasks row not obtained |
 | omitClaudeMd honored | met | the project CLAUDE.md at C:\CC contains the marker "RuFlo"; the parent transcript contains it 7 times; all 16 non-OmniClaude subagent transcripts in the same session contain it; the two OmniClaude worker transcripts (agent-a319e24c65d163482.jsonl, agent-a20e3c990b13c2ef8.jsonl) contain it 0 times and contain "Behavioral Rules (Always Enforced)" 0 times (checked with grep -c on 2026-10-13) |
 | Routing skill triggers on a substantial task | not met in the traced runs | 0 Skill-tool calls in the 2 traced diagnostic runs (scout-call-sites, docs-lookup); Skill use was not counted in the 12 suite runs (see Measured results) |
+| /omni works in a session (spec §9 item 7) | partial | covered by 95 plugin tests; headless `/omni status` could not run because Git Bash converted `/omni` to a Windows path; desktop UI confirmation pending |
+| economy parent runs on Sonnet (verified) (spec §9 item 7) | met | `modelUsage` claude-sonnet-5-5 |
+| Explore under economy runs on Haiku (spec §9 item 8) | met | subagent meta and transcript claude-haiku-5-5 |
+| astra refused without consent, live (spec §9 item 9) | not tested live | covered by plugin tests |
 
 ## Measured results
 
@@ -153,3 +159,100 @@ Next steps (Stage 2 candidates, not done): make the skill description more trigg
 - The effort level applied to each worker was not observable in transcripts. `/tasks` would show it in the UI, but it was not observed.
 - The two dispatches were explicit, so they do not measure whether Claude delegates on its own.
 - The installed copy recorded in installed_plugins.json is pinned to commit a9a048b; whether a session loads that copy or the working tree was not tested.
+
+## Stage 2 live checks
+
+On 2026-10-14 the Stage 2 mod was exercised with headless `claude -p --output-format json` runs on engine 2.1.295 (logged in via claude.ai). The installed plugin was read from `C:\CC\omniclaude\plugins\omniclaude`. The levels below are API-reported `modelUsage` keys from the `-p` JSON result and the `model` fields of the transcripts, not the mod's own claims.
+
+### Alias rejection (before the fix, HEAD 17b6f32)
+
+`claude -p "/omni status"` returned `is_error: true`, `api_error_status: 404` and the result "There's an issue with the selected model (opus)...", with stderr `[claude-code:unrecognized_model] {"model":"opus","query_source":"sdk"}`; cost US$ 0. Conclusion: `turn.step` requires full model ids and rejects aliases. The mod was fixed in b6ab1b9 (`TIER_IDS`, full ids) and the runs below used that commit.
+
+### After the fix (HEAD b6ab1b9)
+
+| Run | Env | Prompt | modelUsage keys (API-reported) | Cost (list) | Turns |
+|---|---|---|---|---|---|
+| economy-pong | `OMNICLAUDE_PROFILE=economy` | "Reply with the single word pong." | claude-sonnet-5-5 | US$ 0.248 | 1 |
+| balanced-pong | `OMNICLAUDE_PROFILE=balanced` | same | claude-opus-5-5 | US$ 0.231 | 1 |
+| economy-explore | `OMNICLAUDE_PROFILE=economy` | "Use the Explore agent to list the Markdown files under docs/ and report only the count." | claude-sonnet-5-5 (parent) + claude-haiku-5-5 (Explore) | US$ 0.147 | 1 |
+| status (headless) | none | "/omni status" | claude-opus-5-5 (the model answered; the command never ran) | US$ 0.493 | 4 |
+
+Transcripts (`~/.claude/projects/C--CC-omniclaude/`):
+
+- economy-explore, session 734c748c-afe3-41f0-b57c-c22ca9928142: the parent transcript shows model claude-sonnet-5-5 ×3; the subagent `agent-a666c88c0e4cf796d` has meta `{"agentType":"Explore", ..., "model":"claude-haiku-5-5"}` and its transcript shows claude-haiku-5-5 ×3.
+- economy-pong, session 8156d150-c5dd-4ecf-9f5d-e2d2b77ede2d: model claude-sonnet-5-5 ×1.
+
+Notes:
+
+- The headless `/omni status` did not run the command. Git Bash (MSYS) converted the argument `/omni status` into the Windows path `C:/Program Files/Git/omni status`, so the model received a plain prompt. This is a test-harness artifact (use `MSYS_NO_PATHCONV=1`, or type the command in the UI), not a mod defect. The mod's `/omni` behavior is covered by 95 plugin tests; a desktop UI confirmation is still pending from the user.
+- The headless and eval runs choose their profile with `OMNICLAUDE_PROFILE` / `EVAL_OMNICLAUDE_PROFILE`, added in the final fix wave because eval and SDK prompts are not classified by `auto`.
+- The `[1m]` suffix on a full id (for example `claude-opus-5-5[1m]`) has not been live-tested.
+
+## Stage 2 measurement
+
+On 2026-10-14 the with/without-plugin eval ran again from `plugins/omniclaude` (engine 2.1.295, plugin at HEAD f937341), once per profile:
+
+```text
+EVAL_OMNICLAUDE_PROFILE=<profile> claude plugin eval . --scaffold --allow-tools Edit Write --model claude-opus-5-5 --runs 3 -j 2 --max-cost-usd 7 --no-publish --trust-plugin --json ...
+```
+
+Both passes exited 0 with `partial: false`; the judge was the default (Haiku). The reports are `plugins/omniclaude/evals/results/2026-10-14T21-48-18-077Z` (balanced) and `2026-10-14T21-53-03-676Z` (economy); both are git-ignored, so they exist only on the machine that ran the eval. The suite is the Stage 1 suite with the `agent-used` and `skill-fired` indicators in every case.
+
+`EVAL_OMNICLAUDE_PROFILE` selects the profile for the with-plugin arm, because eval prompts arrive with a non-composer origin and `auto` never classifies them. The arm without the plugin has no mod, so the variable is inert there.
+
+Cost columns are the mean list-price estimate per run in US$ (as in the Stage 1 table). Δ cost compares WITH to W/OUT.
+
+### Pass 1: balanced
+
+The parent was pinned to claude-opus-5-5 in both arms; the mod routes Explore and general-purpose to Sonnet. Agent-run cost US$ 2.18, 285 s.
+
+| Case | WITH mean | W/OUT mean | Δ cost | WITH / W/OUT score | Agent calls (with) | Skill calls (with) |
+|---|---|---|---|---|---|---|
+| docs-lookup | 0.1121 | 0.0694 | +61% | 1.00 / 1.00 | 0 | 0 |
+| implement-discount | 0.1112 | 0.1007 | +10% | 1.00 / 1.00 | 0 | 0 |
+| scout-call-sites | 0.1092 | 0.0981 | +11% | 1.00 / 1.00 | 0 | 0 |
+| tiny-edit | 0.0680 | 0.0571 | +19% | 1.00 / 1.00 | 0 | 0 |
+
+Per-run cost, WITH: docs 0.1248 / 0.1291 / 0.0822; implement 0.1078 / 0.1188 / 0.1069; scout 0.1002 / 0.1120 / 0.1153; tiny 0.0680 / 0.0680 / 0.0681. W/OUT: docs 0.0694 / 0.0697 / 0.0691; implement 0.0947 / 0.1056 / 0.1018; scout 0.1067 / 0.0895 / 0.0982; tiny 0.0576 / 0.0577 / 0.0562.
+
+### Pass 2: economy
+
+The mod rewrote the with-arm parent to claude-sonnet-5-5 and routes Explore to Haiku; the arm without the plugin ran the parent on claude-opus-5-5. Agent-run cost US$ 1.55, 213 s.
+
+| Case | WITH mean | W/OUT mean | Δ cost | WITH / W/OUT score | Agent calls (with) | Skill calls (with) |
+|---|---|---|---|---|---|---|
+| docs-lookup | 0.0524 | 0.0689 | −24% | 1.00 / 1.00 | 0 | 0 |
+| implement-discount | 0.0529 | 0.1003 | −47% | 1.00 / 1.00 | 0 | 0 |
+| scout-call-sites | 0.0489 | 0.0929 | −47% | 1.00 / 1.00 | 0 | 0 |
+| tiny-edit | 0.0423 | 0.0570 | −26% | 1.00 / 1.00 | 0 | 0 |
+
+Per-run cost, WITH: docs 0.0603 / 0.0597 / 0.0373; implement 0.0531 / 0.0526 / 0.0529; scout 0.0494 / 0.0495 / 0.0476; tiny 0.0428 / 0.0425 / 0.0418. W/OUT: docs 0.0674 / 0.0691 / 0.0704; implement 0.0982 / 0.1055 / 0.0971; scout 0.0881 / 0.0946 / 0.0959; tiny 0.0575 / 0.0562 / 0.0574.
+
+### Counting notes
+
+- `agent-used` and `skill-fired` are with-only indicators (`tool_used`, min 0) present in every case. All 24 WITH runs across both passes show `Agent called 0x` and `Skill called 0x`. `no-astra` passed in all 48 runs.
+- Every scored grader passed in all 48 runs (the LLM judge passed 3/3 votes on implement-discount `correct` and scout-call-sites `answer` in both arms of both passes). Scores sit at the 1.00 ceiling, so the graders cannot detect a quality drop finer than pass/fail.
+
+### Conclusions
+
+- Under `balanced` the plugin adds cost (+10% to +61% per run) with identical scores. The parent is the same model in both arms and no delegation occurred, so nothing offsets the with-arm's added context (the policy section plus the always-on context; this overhead was not isolated by a separate run).
+- Under `economy` the plugin cut cost by 24% to 47% per run with identical scores. The saving comes entirely from the enforced parent model (Sonnet 5.5 instead of Opus 5.5), not from delegation, which stayed at zero.
+- The routing policy in the system prompt did not produce any delegation on these tasks. The policy itself tells the model to keep tiny work in the conversation, and these tasks are small (2–10 turns).
+- Caveats: list-price estimates; 3 runs per arm; synthetic repositories; eval sessions load no user `CLAUDE.md`; graders at ceiling; the parent pin is a model swap whose quality effect on harder work is not measured here.
+
+### Comparison with Stage 1
+
+Same cases, Opus parent, advisory plugin. Stage 1 WITH means were docs 0.1058, implement 0.1058, scout 0.1043 and tiny 0.0652, all higher than W/OUT (Measured results above). Stage 2 `balanced` reproduces that pattern; Stage 2 `economy` inverts it.
+
+### Manual advisor arm (not comparable)
+
+`plugin eval` cannot set the advisor: there is no environment or flag passthrough, and `advisorModel` is a setting while eval homes are isolated. A manual arm therefore ran the four case prompts once each with `claude -p --model claude-sonnet-5-5 --advisor opus` under `EVAL_OMNICLAUDE_PROFILE=economy`, in scaffolded temp workspaces, from the user's real environment (so with the user's `CLAUDE.md`, plugins and MCP servers loaded, a much larger context than the eval's isolated home). These numbers are not comparable with the tables above.
+
+| Case | Cost | Turns | modelUsage | Answer correct? |
+|---|---|---|---|---|
+| docs-lookup | 0.0938 | 3 | claude-sonnet-5-5 only (cr 73,054 / cw 18,447) | yes (45 s, ACME_SYNC_TIMEOUT, sync.md) |
+| scout-call-sites | 0.1267 | 9 | claude-sonnet-5-5 only (cr 165,770) | yes (3 call sites) |
+| implement-discount | 0.1157 | 5 | claude-sonnet-5-5 only | plausible (not graded) |
+| tiny-edit | 0.0986 | 3 | claude-sonnet-5-5 only | yes |
+
+No Opus usage appears in `modelUsage` and no advisor server-tool use was recorded, so there is no evidence the advisor was consulted on these small prompts. The higher costs versus the eval's economy arm come from the larger real-environment context, not from the advisor. Conclusion: the advisor's effect on cost and quality is not measured, and the README may only describe it as an option.

@@ -198,7 +198,7 @@ EVAL_OMNICLAUDE_PROFILE=<profile> claude plugin eval . --scaffold --allow-tools 
 
 Both passes exited 0 with `partial: false`; the judge was the default (Haiku). The reports are `plugins/omniclaude/evals/results/2026-10-14T21-48-18-077Z` (balanced) and `2026-10-14T21-53-03-676Z` (economy); both are git-ignored, so they exist only on the machine that ran the eval. The suite is the Stage 1 suite with the `agent-used` and `skill-fired` indicators in every case.
 
-`EVAL_OMNICLAUDE_PROFILE` selects the profile for the with-plugin arm, because eval prompts arrive with a non-composer origin and `auto` never classifies them. The arm without the plugin has no mod, so the variable is inert there.
+`EVAL_OMNICLAUDE_PROFILE` selects the profile for the with-plugin arm, because eval prompts reportedly arrive with a non-composer origin and `auto` never classifies them. The arm without the plugin has no mod, so the variable is inert there.
 
 Cost columns are the mean list-price estimate per run in US$ (as in the Stage 1 table). Δ cost compares WITH to W/OUT.
 
@@ -217,7 +217,7 @@ Per-run cost, WITH: docs 0.1248 / 0.1291 / 0.0822; implement 0.1078 / 0.1188 / 0
 
 ### Pass 2: economy
 
-The mod was configured to rewrite the with-arm parent to claude-sonnet-5-5 (served model not recorded by the eval; see the headless live check) and to route Explore to Haiku; the arm without the plugin ran the parent on claude-opus-5-5. Agent-run cost US$ 1.55, 213 s.
+The mod was configured to rewrite the with-arm parent to claude-sonnet-5-5 (served model not recorded by the eval; see the headless live check) and to route Explore to Haiku; the arm without the plugin was pinned to claude-opus-5-5 with --model (served model not recorded by the eval). Agent-run cost US$ 1.55, 213 s.
 
 | Case | WITH mean | W/OUT mean | Δ cost | WITH / W/OUT score | Agent calls (with) | Skill calls (with) |
 |---|---|---|---|---|---|---|
@@ -235,8 +235,8 @@ Per-run cost, WITH: docs 0.0603 / 0.0597 / 0.0373; implement 0.0531 / 0.0526 / 0
 
 ### Conclusions
 
-- Under `balanced` the plugin adds cost (+10% to +61% per run) with identical scores. The parent is the same model in both arms and no delegation occurred, so nothing offsets the with-arm's added context (the policy section plus the always-on context; this overhead was not isolated by a separate run).
-- Under `economy` the plugin cut cost by 24% to 47% per run with identical scores. The saving is consistent with the enforced Sonnet parent (the eval JSON records no served model; the headless check with the same env var showed `claude-sonnet-5-5`) and not with delegation, which stayed at zero in all 24 with-plugin Stage 2 eval runs; the mod's effort setting and added context were not isolated.
+- Under `balanced` the plugin adds cost (+10% to +61% per run) with identical scores. Both arms were pinned to the same parent model with --model (served model not recorded) and no delegation occurred, so nothing offsets the with-arm's added context (the policy section plus the always-on context; this overhead was not isolated by a separate run).
+- Under `economy` the plugin cut cost by 24% to 47% per run with identical scores. The saving is consistent with the enforced Sonnet parent (the eval JSON records no served model; the headless check with `OMNICLAUDE_PROFILE=economy` showed `claude-sonnet-5-5`) and not with delegation, which stayed at zero in all 24 with-plugin Stage 2 eval runs; the mod's effort setting and added context were not isolated.
 - The routing policy in the system prompt did not produce any delegation on these tasks. The policy itself tells the model to keep tiny work in the conversation, and these tasks are small (2–10 turns).
 - Caveats: list-price estimates; 3 runs per arm; synthetic repositories; eval sessions load no user `CLAUDE.md`; graders at ceiling; the parent pin is a model swap whose quality effect on harder work is not measured here.
 

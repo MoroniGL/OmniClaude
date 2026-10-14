@@ -47,11 +47,11 @@ Rules:
 
 Every row says what the mod **applies**. What the API reports back is shown separately, as "verified" in `/omni status`.
 
-Live-verified on 2026-10-14 (engine 2.1.295, headless runs): the alias rejection and the full ids above; under `economy` the parent answered on `claude-sonnet-5-5` and an Explore subagent on `claude-haiku-5-5`; under `balanced` the parent answered on `claude-opus-5-5`. See [local validation](local-validation.md). Not yet live-verified: the `quality`, `max` and `auto` profiles, Plan and general-purpose routing, the clamps, the astra refusal in a live session, and `/omni` in a desktop session (the mod's tests cover them).
+Live-verified on 2026-10-14 (engine 2.1.295, headless runs): the alias rejection and the full ids above; under `economy` the parent answered on `claude-sonnet-5-5` and an Explore subagent on `claude-haiku-5-5`; under `balanced` the parent answered on `claude-opus-5-5`. See [local validation](local-validation.md). Not yet live-verified: the `quality`, `max` and `auto` profiles, Plan and general-purpose routing, routing of other plugins' agents, the clamps, the astra refusal in a live session, and `/omni` in a desktop session (the mod's tests cover them).
 
 ## `omni:auto`
 
-On each prompt you type in the composer, the mod runs one small model call (`$.model.classify`) with four labels. Notifications, prompts from other agents, and headless or eval prompts are not classified.
+On each prompt you type in the composer, the mod runs one small model call (`$.model.classify`) with four labels. Notifications, prompts from other agents, and headless or eval prompts, which reportedly arrive with a non-composer origin, are not classified.
 
 | Class | Effort | Model |
 |---|---|---|

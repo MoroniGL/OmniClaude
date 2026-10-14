@@ -13,7 +13,7 @@ The mod applies the profile. It lives in `plugins/omniclaude/hooks/` and loads o
 | Hook | What it does |
 |---|---|
 | `session.start` | registers `/omni`; when the resolved profile is `max`, sets the astra consent as `/omni max` does; shows the `omni:<profile>` badge |
-| `command.run` (`/omni`) | `status`, `<profile>`, `save <profile>`, `reset`, `astra allow\|deny`, `doctor`; text answers only, nothing enters the model's context; entering `max` sets the astra consent, leaving `max` via an `/omni` command clears the consent that `max` set (a `/config` change does not); `/omni reset` back to a saved `max` sets it |
+| `command.run` (`/omni`) | `status`, `<profile>`, `save <profile>`, `reset`, `astra allow\|deny`, `doctor`; text answers only, nothing enters the model's context; entering `max` sets the astra consent, leaving `max` via an `/omni` command clears the consent that `max` set (a `/config` change or another session's save does not clear it); `/omni reset` back to a saved `max` sets it |
 | `prompt.submit` | under `auto`, classifies each prompt typed in the composer (`$.model.classify`, 2.5 s timeout) and records the plan and the class; no label, a failed request or a timeout keeps the plan; other origins are left alone |
 | `turn.step` | rewrites the model (full model ids, and only across tiers) and the effort of main-loop requests; records what the engine asked for (`lastStep`) and what was applied (`applied`); subagent steps are not touched; if the hook fails, the step runs unchanged and the badge reads `not applied (hook error)` |
 | `agent.spawn` | the astra consent gate (it reads only the consent flag), then the worker-tier clamp and the profile tier for Explore, Plan, general-purpose and other plugins' agents (agents of your own only if the engine reports them as non-engine-provided; not live-verified); the engine's other built-in agents, forks, teammates and workflow agents are not rewritten; records the decision (`lastSpawn`), and that record never denies a spawn; if the guard fails before the spawn is passed on, the spawn is refused |
@@ -36,7 +36,7 @@ Configuration is a request. OmniClaude reports three levels separately:
 
 For subagents, the mod records only its own decision for the last spawn (`/omni status`, "last spawn": the agent type and the id it set, or `unchanged`). That is applied, not verified: `/tasks` names each subagent's model and effort setting and their transcripts record the served model, and the mod does not read those back.
 
-Live-verified on 2026-10-14 (engine 2.1.295, headless runs): the engine rejects aliases in `turn.step` and the mod sends full model ids; under `economy` the parent answered on `claude-sonnet-5-5` and an Explore subagent on `claude-haiku-5-5`; under `balanced` the parent answered on `claude-opus-5-5`. Not yet live-verified: the latency of the `auto` classifier call (capped at 2.5 s), the `[1m]` form of a full id, and `/omni` in a desktop session.
+Live-verified on 2026-10-14 (engine 2.1.295, headless runs): the engine rejects aliases in `turn.step` and the mod sends full model ids; under `economy` the parent answered on `claude-sonnet-5-5` and an Explore subagent on `claude-haiku-5-5`; under `balanced` the parent answered on `claude-opus-5-5`. Not yet live-verified: routing of other plugins' agents, the latency of the `auto` classifier call (capped at 2.5 s), the `[1m]` form of a full id, and `/omni` in a desktop session.
 
 ## Delivery
 - Stage 1: agents, skill, CLI profile files, eval suite. No hooks.

@@ -1,33 +1,56 @@
 # Profiles
 
-A profile sets what the OmniClaude mod applies in a session: the **parent's** model and effort, the tier of subagents that have no model of their own, and whether `astra-expert` needs your consent. OmniClaude's own workers keep their tiers in every profile. Where the mod is off, profiles are only the `--settings` files below.
+A profile sets what the OmniClaude mod applies in a session: the **parent's** model and effort, the tier of the subagents the mod routes, and whether `astra-expert` needs your consent. OmniClaude's own workers keep their tiers in every profile. Where the mod is off, profiles are only the `--settings` files below.
 
-Choose a profile with `/omni <profile>` (this session), `/omni save <profile>` (future sessions, kept in the plugin's own store, not in `settings.json`), or the `/config` picker "Routing profile". The profile in force is the session override, else the saved profile, else the picker value, else `auto`. The saved profile wins over the picker.
+Choose a profile with `/omni <profile>` (this session), `/omni save <profile>` (the plugin's own store, not `settings.json`), the `OMNICLAUDE_PROFILE` environment variable, or the `/config` picker "Routing profile". The profile in force is, in order:
+
+1. the session override (`/omni <profile>`);
+2. the saved profile (`/omni save <profile>`);
+3. the environment variable `OMNICLAUDE_PROFILE`, else `EVAL_OMNICLAUDE_PROFILE`;
+4. the `/config` picker "Routing profile";
+5. `auto`.
+
+Notes:
+
+- `/omni save <profile>` applies now when no session override stands in front of it, and in future sessions. With an override, the saved profile waits until `/omni reset`.
+- A value in either environment variable that names no profile counts as unset. The environment outranks the picker because the engine always fills the picker with its default (`auto`). `EVAL_OMNICLAUDE_PROFILE` is what a `claude plugin eval` with-plugin session inherits.
+- Prompts from `claude -p`, the SDK and `plugin eval` do not come from the composer, so `auto` never classifies them. Pick a fixed profile for such runs, for example `OMNICLAUDE_PROFILE=economy claude -p "..."`.
 
 ## Enforced by the mod
 
-| Profile | Parent (every main-loop request) | Explore | Plan, general-purpose, other model-less subagents | astra-expert |
+| Profile | Parent (every main-loop request) | Explore | Plan, general-purpose and other routed subagents | astra-expert |
 |---|---|---|---|---|
 | `omni:economy` | Sonnet / medium | Haiku | Sonnet | denied until `/omni astra allow` |
 | `omni:balanced` | Opus / medium | Sonnet | Sonnet | denied until `/omni astra allow` |
 | `omni:quality` | Opus / high | Sonnet | Opus | denied until `/omni astra allow` |
-| `omni:max` | Fable / high | Opus | Opus | allowed; `max` counts as consent |
+| `omni:max` | Fable / high | Opus | Opus | allowed; `max` sets the consent flag |
 | `omni:auto` (default) | chosen per prompt (below); Opus / medium until the first prompt is classified | as `balanced` | as `balanced` | denied until `/omni astra allow` |
 
 Rules:
 
-- A worker's own frontmatter tier is applied as it is (luna Haiku, terra Sonnet, sol Opus, astra Fable). If a caller passes a `model` above that tier, the mod clamps it back to the tier, except under `max`. A `model` below the tier is allowed.
-- For any other agent, an explicit `model` request is clamped to the profile's tier for it (Explore tier, or the general tier), except under `max`, where the request stands. With no request, the profile's tier applies. The mod cannot read a custom agent's own frontmatter model, so custom agents are routed this way too.
-- `omniclaude:astra-expert` is denied with `astra-expert needs your agreement: run /omni astra allow` until you run that command or the profile is `max`. Consent that `max` grants is cleared when you leave `max`; consent you gave with `/omni astra allow` survives profile changes. `/omni astra deny` withdraws explicit consent. Fable may bill usage credits on some plans.
-- Effort on subagent loops is not rewritten; the worker's own effort applies.
-- Forks, teammates and workflow agents are not rewritten. Only the astra consent gate applies to them.
-- 1M context: a parent started on a `[1m]` alias keeps `opus[1m]` or `sonnet[1m]`. Fable and Haiku have no 1M alias, so `max` sends plain `fable`.
+- **Model ids.** The engine rejects aliases in `turn.step`; the mod sends full model ids (live-verified 2026-10-14): `claude-haiku-5-5`, `claude-sonnet-5-5`, `claude-opus-5-5`, `claude-fable-5-1`.
+- **Main loop.** A step whose model is already on the profile's tier keeps the engine's own id and gets the profile's effort; a step on another tier is rewritten to the tier's id. When the engine's model carries a `[1m]` suffix, a rewritten Opus or Sonnet id keeps it. Fable and Haiku have no 1M form, so `max` sends plain `claude-fable-5-1`. (The `[1m]` form of a full id has not been live-tested.)
+- **OmniClaude workers.** A worker's own frontmatter tier is applied as it is (luna Haiku, terra Sonnet, sol Opus, astra Fable). If a caller passes a `model` above that tier, or one the mod cannot place, the mod replaces it with the tier's id, except under `max`, where the request stands. A `model` at or below the tier stands.
+- **Other agents.** Explore gets the profile's explore tier. Plan, general-purpose and every agent that does not come from the engine itself (other plugins' agents and your own) get the profile's general tier; Plan follows the general tier. With no request, the profile's tier applies. With an explicit `model` request, a request above the profile's tier (or one the mod cannot place) is replaced by the tier's id and one at or below it stands; under `max` the request stands. The mod cannot read a custom agent's own frontmatter model, so custom agents are routed this way too.
+- **Engine built-ins.** Among the engine's own agents only Explore, Plan and general-purpose are routed. Others (claude-code-guide, statusline-setup and the like) keep their own model.
+- **Not routed.** Forks, teammates and workflow agents are not rewritten. The consent gate below still applies to a teammate or workflow agent of type `astra-expert`.
+- **Effort** on subagent loops is not rewritten; the worker's own effort applies.
+- **astra-expert consent.** `omniclaude:astra-expert` (under any plugin name) is denied with `astra-expert needs your agreement: run /omni astra allow` unless the consent flag is true. The flag is set by:
+  - `/omni astra allow`;
+  - `/omni max`;
+  - `/omni save max`, when `max` becomes the effective profile;
+  - session start, when the resolved profile is `max` (also through `OMNICLAUDE_PROFILE=max`).
 
-Every row says what the mod **applies**. What the API reports back is shown separately, as "verified" in `/omni status`. Not yet live-verified: that the engine accepts the alias strings the mod sends (`opus`, `sonnet[1m]`, and so on) in a main-loop step.
+  Consent that `max` sets is cleared when you leave `max`; consent you gave with `/omni astra allow` survives profile changes. `/omni astra deny` clears the flag and keeps astra-expert denied even under `max`. Fable may bill usage credits on some plans.
+- **Records and failures.** The mod records the last spawn it decided (`/omni status`, "last spawn": the agent type and the id it set, or `unchanged`). The record never denies a spawn. If the spawn guard itself fails before it passes the spawn on, the spawn is refused. If `turn.step` fails, the step runs unchanged and the badge reads `not applied (hook error)`.
+
+Every row says what the mod **applies**. What the API reports back is shown separately, as "verified" in `/omni status`.
+
+Live-verified on 2026-10-14 (engine 2.1.295, headless runs): the alias rejection and the full ids above; under `economy` the parent answered on `claude-sonnet-5-5` and an Explore subagent on `claude-haiku-5-5`; under `balanced` the parent answered on `claude-opus-5-5`. See [local validation](local-validation.md). Not yet live-verified: the `quality`, `max` and `auto` profiles, Plan and general-purpose routing, the clamps, the astra refusal in a live session, and `/omni` in a desktop session (the mod's tests cover them).
 
 ## `omni:auto`
 
-On each prompt you type, the mod runs one small model call (`$.model.classify`) with four labels. Notifications and prompts from other agents are not classified.
+On each prompt you type in the composer, the mod runs one small model call (`$.model.classify`) with four labels. Notifications, prompts from other agents, and headless or eval prompts are not classified.
 
 | Class | Effort | Model |
 |---|---|---|
@@ -39,23 +62,24 @@ On each prompt you type, the mod runs one small model call (`$.model.classify`) 
 Cache rule. Switching the parent model drops the prompt cache; changing effort keeps it (on the 5.5 models and Fable 5.1).
 
 - Effort follows the class on every prompt.
-- The parent model is chosen at the first classified prompt.
-- A later upgrade (Sonnet to Opus) happens only when the class asks for it and the context is below 40,000 tokens. Otherwise the model is kept, effort is raised to `high`, and the reason `kept <model> to preserve the cache` is recorded.
+- The parent model is chosen at the first classified prompt. The model auto last ran on comes from the steps applied under `auto` (before any such step, from the plan); a step run under a fixed profile does not count.
+- A later upgrade (Sonnet to Opus) happens only when the class asks for it and the context is below 40,000 tokens. Otherwise the model is kept, effort is raised to `high`, and the reason `kept <model> to preserve the cache` is recorded. If the context size cannot be read, it counts as full and the model is kept.
 - The model is never downgraded mid-session.
-- If the classifier names no label or its request fails, the previous plan stays and `/omni status` says so.
+- The classifier gets 2.5 s. If it names no label, its request fails, or it times out, the previous plan stays and `/omni status` says which (`classifier gave no label; plan kept`, `classifier request failed; plan kept`, `classifier timed out; plan kept`).
+- Switching to another profile drops auto's plan and its last classification.
 - The last classification shows in `/omni status`; the status-line badge reads `omni:auto · <class> → <model>/<effort>` during a turn.
 
-Not yet live-verified: the latency of the classifier call on a real session. Its cost is one small completion per prompt you type.
+Its cost is one small completion per prompt you type, waiting at most 2.5 s. Not yet live-verified: the actual latency of the classifier call on a real session.
 
 ## Requested, applied, verified
 
 | Level | Source | Shown |
 |---|---|---|
 | requested | the profile table or the `auto` plan | `/omni status`, "requested parent" |
-| applied | what the mod sent for the step | `/omni status`, "applied (last step)" |
+| applied | what the mod sent for the step | `/omni status`, "applied (last step)"; "engine requested (last step)" is what the engine was about to send |
 | verified | `turn.complete.usage.model`, the model id the API reports | `/omni status`, "verified (last turn, API-reported)"; the badge shows a check mark when the verified tier matches the applied tier, and `≠ <model>` otherwise |
 
-Verified covers the main conversation. For subagents, `/tasks` and their transcripts are the evidence.
+Verified covers the main conversation. For subagents, `/tasks` and their transcripts are the evidence; "last spawn" in `/omni status` is what the mod set on the spawn, not what answered.
 
 ## Sessions without the mod
 
@@ -84,15 +108,15 @@ claude --settings /path/to/balanced.settings.json
 
 The desktop app has no `--settings` equivalent. With the mod on, use `/omni`. With it off, pick the parent with `/model <alias>` and the effort with `/effort <level>`. Pressing `s` in either picker keeps the change for this session only. Changing the parent model mid-session re-reads the whole conversation without cache. Changing effort keeps the cache on the 5.5 models and Fable 5.1.
 
-## Optional: the advisor (not measured)
+## Optional: the advisor
 
-Claude Code has an experimental advisor feature (official docs at https://code.claude.com/docs/en/advisor, checked 2026-10-14). OmniClaude does not configure or automate it.
+Claude Code has an experimental advisor feature (official docs at https://code.claude.com/docs/en/advisor, checked 2026-10-14). The advisor is optional and OmniClaude does not configure or automate it; it is not measured: a manual arm showed no advisor call on these small prompts.
 
 - A stronger model that the main model can consult. Set it with `/advisor opus`, the `advisorModel` setting, or `--advisor`.
 - Anthropic API only (subscriptions included). Claude decides when to consult it; on each call the advisor reads the whole conversation, billed at the advisor's own rates.
 - A Sonnet 5.5 parent accepts Fable, Opus 5 or later, and Sonnet 5.5 advisors. Subagents inherit the advisor. Fable as an advisor needs usage-credit consent.
 
-A combination you could try is `economy` plus `/advisor opus`: a Sonnet parent that consults Opus for consequential reasoning, a rough analogue of OmniCodex's "Terra control plane, Sol for consequential reasoning". It has not been measured, and because each consultation re-reads the conversation it may cost more than a single-model setup.
+A combination you could try is `economy` plus `/advisor opus`: a Sonnet parent that consults Opus for consequential reasoning, a rough analogue of OmniCodex's "Terra control plane, Sol for consequential reasoning". Its effect on cost and quality is not measured, and because each consultation re-reads the conversation it may cost more than a single-model setup.
 
 ## Naming
 

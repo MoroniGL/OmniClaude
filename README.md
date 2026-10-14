@@ -83,7 +83,7 @@ claude --settings ~/omniclaude-profiles/balanced.settings.json
 
 - **Tiers are requested, not enforced.** Claude can pass its own model or effort on an Agent call.
 - **'Read-only' and 'no edits' are instructions, not tool restrictions,** for terra-explorer, sol-planner and sol-reviewer, which keep Bash. Only luna-researcher has no shell at all.
-- **Delegation is Claude's choice.** It depends on Claude choosing to delegate, and in the Stage 1 eval no delegation occurred in the 8 with-plugin runs where Agent-tool use was counted (the other 6 of 14 had no general Agent counter); see measured results.
+- **Delegation is Claude's choice.** It depends on Claude choosing to delegate, and in the Stage 1 eval no OmniClaude-worker dispatch was observed in the 8 of 14 with-plugin runs that had a counter (scout-call-sites counted only `omniclaude:` matches; tiny-edit and the 2 traced diagnostics counted any Agent call; the other 6 had no general Agent counter); see measured results.
 - **Multi-model setups can cost more** than one model at lower effort. OmniClaude claims savings only from a measured eval.
 - **Other providers degrade the tiers.** On Bedrock, Vertex and Foundry the aliases map to older models, some without effort support.
 - **Fable may bill usage credits** on some plans (Anthropic's support article on Fable access describes Pro and Team Standard seats; check your plan). `astra-expert` never runs without your explicit agreement.

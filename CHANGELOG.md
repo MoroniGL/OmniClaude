@@ -11,4 +11,4 @@
 - Offline asset tests, CI, and a `claude plugin eval` suite with a no-plugin baseline.
 - `docs/local-validation.md` records the local install and explicit-dispatch evidence.
 - No hooks, no settings written by the plugin itself (installing records it in settings, as any plugin does), no savings claims.
-- Stage 1 eval (4 synthetic cases, Opus 5.5 parent): identical grader scores (1.00, the ceiling) with and without the plugin, higher cost with it in all four cases (+3% to +66% per run), no delegation in the 8 counted with-plugin runs, routing skill not invoked in the 2 traced runs. Recorded in docs/local-validation.md; no savings claim.
+- Stage 1 eval (4 synthetic cases, Opus 5.5 parent): identical grader scores (1.00, the ceiling) with and without the plugin, higher cost with it in all four cases (+3% to +66% per run), no OmniClaude-worker dispatch in the 8 counted with-plugin runs (6 uncounted), routing skill not invoked in the 2 traced runs. Recorded in docs/local-validation.md; no savings claim.

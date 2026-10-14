@@ -89,11 +89,64 @@ Two bounded tasks were dispatched from the parent, a Fable 5.1 session:
 | omniclaude:luna-researcher and omniclaude:terra-implementer callable in a new desktop session | partial | both listed by the Agent tool; luna-researcher and terra-explorer were invoked (table above); terra-implementer was listed but not invoked |
 | /tasks and transcript show requested model and effort | partial | model verified from both worker transcripts; effort not observed; /tasks row not obtained |
 | omitClaudeMd honored | met | the project CLAUDE.md at C:\CC contains the marker "RuFlo"; the parent transcript contains it 7 times; all 16 non-OmniClaude subagent transcripts in the same session contain it; the two OmniClaude worker transcripts (agent-a319e24c65d163482.jsonl, agent-a20e3c990b13c2ef8.jsonl) contain it 0 times and contain "Behavioral Rules (Always Enforced)" 0 times (checked with grep -c on 2026-10-13) |
-| Routing skill triggers on a substantial task | not tested | the eval suite (Task 9) measures delegation; the two dispatches above were explicit |
+| Routing skill triggers on a substantial task | not met in the eval | 0 Skill-tool calls and 0 Agent-tool calls across 12 WITH runs plus 2 diagnostic runs (see Measured results) |
 
 ## Measured results
 
-Pending: the with/without-plugin eval (Task 9) runs after the standalone engine is authenticated. No savings claim is made.
+On 2026-10-14 the with/without-plugin eval ran from `plugins/omniclaude` (engine 2.1.295, logged in via claude.ai) with:
+
+```text
+claude plugin eval . --scaffold --allow-tools Edit Write --model claude-opus-5-5 --runs 3 -j 2 --max-cost-usd 15 --no-publish --trust-plugin --json omni-eval.json
+```
+
+The parent model was pinned to `claude-opus-5-5` in both arms; the judge model was the default (Haiku). The suite was 4 cases × 3 runs × 2 arms = 24 agent runs plus Haiku judge calls. Exit code 0, `partial: false`, suite wall time 192 s, total list-price cost US$ 2.11. The full JSON is `.superpowers/sdd/2026-10-13-omniclaude-stage1-core/task-9-eval-result.json` and the HTML report is `plugins/omniclaude/evals/results/2026-10-14T10-13-32-943Z/report.html`. Both paths are git-ignored, so they exist only on the machine that ran the eval. No savings claim is made.
+
+Scores are the mean per case (1.00 means every grader passed in every run). Costs are the mean list-price estimate per run in US$, cache reads and writes included, judge cost excluded.
+
+| Case | WITH score | W/OUT score | Δ | WITH cost | W/OUT cost | Delegated (with-arm) | Models served (with-arm) |
+|---|---|---|---|---|---|---|---|
+| docs-lookup | 1.00 | 1.00 | 0.00 | 0.1058 | 0.0638 | 0 of 3 runs | claude-opus-5-5 only (parent); no worker dispatched |
+| implement-discount | 1.00 | 1.00 | 0.00 | 0.1058 | 0.1024 | 0 of 3 runs | claude-opus-5-5 only (parent); no worker dispatched |
+| scout-call-sites | 1.00 | 1.00 | 0.00 | 0.1043 | 0.1007 | 0 of 3 runs | claude-opus-5-5 only (parent); no worker dispatched |
+| tiny-edit | 1.00 | 1.00 | 0.00 | 0.0652 | 0.0569 | 0 of 3 runs | claude-opus-5-5 only (parent); no worker dispatched |
+
+How delegation was counted:
+- scout-call-sites: the `delegated` grader (Agent calls whose input matches `omniclaude:`, WITH arm only) failed in all 3 WITH runs with "Agent called 0x (expected 1..∞)". The parent never dispatched an OmniClaude worker.
+- tiny-edit: the `no-delegation` grader (any Agent call, both arms) passed in all 6 runs, so there was no over-delegation on the tiny task.
+- every case: the `no-astra` grader (Agent calls matching `astra-expert`, both arms) passed in all 24 runs.
+- docs-lookup and implement-discount have no grader that counts Agent calls other than `astra-expert`, and the per-run traces of the full suite were temporary files that are no longer on disk. For those two cases the 0 of 3 was not asserted by a grader; the only direct Agent-call count there is the single docs-lookup diagnostic run below.
+
+### Diagnostic: did the routing skill fire?
+
+Two extra single-arm (WITH only), single-run diagnostics were run on 2026-10-14 with `--keep-temp` (parent `claude-opus-5-5`) and their traces were inspected. Cost: US$ 0.15 for scout-call-sites and US$ 0.08 for docs-lookup.
+
+- scout-call-sites: 10 turns; tools used: Grep ×3, Glob ×1, Read ×5; `Skill` tool calls: 0; `Agent` tool calls: 0; models in the trace: claude-opus-5-5 only; usage 45,740 cache-write + 122,065 cache-read + 908 output tokens. The only mention of "omniclaude" in the trace is the system prompt's agent/skill listing.
+- docs-lookup: 4 turns; tools used: Grep ×1, Read ×2; `Skill` calls: 0; `Agent` calls: 0; claude-opus-5-5 only; usage 8,436 cache-write + 41,470 cache-read + 309 output tokens.
+
+The `routing` skill never fired on these prompts and the parent never delegated. `Skill`-tool calls were counted only in these two diagnostic runs, not in the 12 suite runs.
+
+### Conclusion
+
+- Cost did not go down on any task shape. Mean cost per run with the plugin was higher on all four cases: docs-lookup +66%, tiny-edit +15%, scout-call-sites +4%, implement-discount +3%. The +66% case is noisy: its three WITH runs cost 0.1273 / 0.1218 / 0.0683 against 0.0658 / 0.0662 / 0.0592 W/OUT. These are per-case results of this one suite, not a general cost figure.
+- Quality held. Every case scored 1.00 in both arms, every grader passed in all 24 runs, and Δ = 0.00 everywhere. The plugin neither helped nor hurt correctness on these tasks.
+- Delegation rate: 0 of 12 WITH runs delegated (see "How delegation was counted" for what each figure rests on).
+- The plugin's only runtime effect in this suite was its always-on context (~636 tokens per session, from `plugin details`), a fixed overhead. Because the parent never delegated, no cheaper-tier execution happened to offset it.
+
+Caveats:
+- Costs are list-price estimates, not billed amounts.
+- 3 runs per arm.
+- The repositories are small and synthetic (the scout case is 47 files of about 8 lines, and a single Grep finds every call site).
+- Eval sessions load no user `CLAUDE.md` and no other plugins.
+- The tasks are small enough that Opus 5.5 handles them in 2–10 turns without needing help.
+
+### Hypotheses and next steps (not measured)
+
+Possible causes of the missing delegation. None of these was tested:
+- The routing skill's description triggers on "substantial multi-step work"; Opus 5.5 may classify these 2–10-turn tasks as small enough to do directly (the skill itself says tiny work stays in the parent).
+- Claude Code 2.1.295 ships prompt text that discourages delegation unless a `CLAUDE.md` or skill asks for it; a skill that is not invoked cannot ask.
+- Eval sessions load no user `CLAUDE.md`, so nothing else encourages delegation.
+
+Next steps (Stage 2 candidates, not done): make the skill description more trigger-rich for exploration and research phrasing; test larger repositories where exploration genuinely exceeds the parent's context; measure delegation rate as a first-class metric (`tool_used` Skill and Agent graders) before any cost claim.
 
 ## Caveats
 

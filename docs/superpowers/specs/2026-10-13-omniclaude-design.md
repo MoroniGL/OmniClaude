@@ -121,7 +121,7 @@ from section 5 in every profile.
 | `economy` | sonnet | medium | inherit (Sonnet) | Terra-first control plane |
 | `balanced` | opus | medium | sonnet | equals Claude Code's native default plus routing |
 | `quality` | opus | high | inherit (Opus) | xhigh left to the user per session |
-| `max` | fable | high | opus | plan-gated: Fable bills usage credits on Pro and Team Standard |
+| `max` | fable | high | opus | plan-gated: Fable may bill usage credits on some plans |
 | `auto` | unchanged | unchanged | unchanged | policy only, recommend-only; displayed as `omni:auto` |
 
 Docs always render `omni:max` and `omni:auto`, so the names are not confused with effort
@@ -253,7 +253,7 @@ The stage 2 outline below gets re-planned with stage 1 evidence:
 ## 12. Open risks
 
 - Routing value is unproven until the stage 1 eval runs.
-- The parent may not delegate. Delegation rate is measured, not assumed.
+- The parent may not delegate. Delegation rate is measured, not assumed; the Stage 1 eval measured 0 of 12 runs.
 - Issue anthropics/claude-code#43869 reports `CLAUDE_CODE_SUBAGENT_MODEL` from settings
   `env` being ignored. It is verified live before stage 2 relies on it.
 - Off the Anthropic API, aliases degrade: on Bedrock and Vertex, `sonnet` maps to 4.5

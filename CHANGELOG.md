@@ -11,3 +11,4 @@
 - Offline asset tests, CI, and a `claude plugin eval` suite with a no-plugin baseline.
 - `docs/local-validation.md` records the local install and live delegation evidence.
 - No hooks, no settings written by the plugin itself (installing records it in settings, as any plugin does), no savings claims.
+- Stage 1 eval (4 synthetic cases, Opus 5.5 parent): identical quality with and without the plugin, equal or higher cost with it, routing skill never invoked. Recorded in docs/local-validation.md; no savings claim.

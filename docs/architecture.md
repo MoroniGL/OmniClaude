@@ -12,7 +12,7 @@ The parent conversation owns decomposition, delegation, dependency tracking, acc
 Seven plugin agents (`omniclaude:<name>`) with pinned model aliases and effort levels. Every worker disallows the `Agent` tool, so it cannot spawn nested subagents that would bypass the tiers. The read-only workers (luna, terra-explorer) skip `CLAUDE.md` to stay lean and avoid project instructions that ask for swarms.
 
 ## Runtime evidence
-Configuration is a request. The parent may override a worker's model or effort per call. `/tasks` and subagent transcripts show what actually ran. OmniClaude reports requested, observed, and verified separately.
+Configuration is a request. The parent may override a worker's model or effort per call. `/tasks` names each subagent's model and effort setting, and subagent transcripts record the served model. OmniClaude reports requested, observed, and verified separately.
 
 ## Delivery
 - Stage 1 (this release): agents, skill, CLI profiles, eval suite. No hooks.

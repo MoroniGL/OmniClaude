@@ -41,12 +41,13 @@ test('balanced pins the main loop to opus/medium', async ($, on) => {
   on('turn.step', async function* (_$, e) { sent = e; return STEP_RESULT(e) })
   await ready($, on, 'balanced')
   await drain($.turn.step(STEP('claude-sonnet-5-5', 'high')))
-  expect(sent.model).toBe('opus')
+  expect(sent.model).toBe('claude-opus-5-5')
   expect(sent.effort).toBe('medium')
   const text = await status($)
   expect(text).toContain('OmniClaude balanced')
+  expect(text).toContain('requested parent: opus/medium')
   expect(text).toContain('engine requested (last step): claude-sonnet-5-5/high')
-  expect(text).toContain('applied (last step): opus/medium')
+  expect(text).toContain('applied (last step): claude-opus-5-5/medium')
   expect(text).toContain('verified (last turn, API-reported): none yet')
 })
 
@@ -56,14 +57,14 @@ test('economy pins the main loop to sonnet/medium and leaves subagent steps alon
   await ready($, on, 'economy')
   await drain($.turn.step(STEP('claude-opus-5-5', 'high')))
   await drain($.turn.step(STEP('claude-haiku-5-5', 'low', 'agent-1')))
-  expect(seen[0].model).toBe('sonnet')
+  expect(seen[0].model).toBe('claude-sonnet-5-5')
   expect(seen[0].effort).toBe('medium')
   expect(seen[1].model).toBe('claude-haiku-5-5')
   expect(seen[1].effort).toBe('low')
   // the subagent step neither overwrote the main-loop record nor the applied target
   const text = await status($)
   expect(text).toContain('engine requested (last step): claude-opus-5-5/high')
-  expect(text).toContain('applied (last step): sonnet/medium')
+  expect(text).toContain('applied (last step): claude-sonnet-5-5/medium')
 })
 
 test('agent.spawn routes Explore and general-purpose by profile', async ($, on) => {
@@ -72,8 +73,8 @@ test('agent.spawn routes Explore and general-purpose by profile', async ($, on) 
   await ready($, on, 'economy')
   await $.agent.spawn(SPAWN('Explore'))
   await $.agent.spawn(SPAWN('general-purpose'))
-  expect(spawned[0].model).toBe('haiku')
-  expect(spawned[1].model).toBe('sonnet')
+  expect(spawned[0].model).toBe('claude-haiku-5-5')
+  expect(spawned[1].model).toBe('claude-sonnet-5-5')
 })
 
 test('agent.spawn clamps a worker request above its tier', async ($, on) => {
@@ -81,6 +82,14 @@ test('agent.spawn clamps a worker request above its tier', async ($, on) => {
   on('agent.spawn', async (_$, e) => { spawned.push(e); return { model: e.model ?? 'inherit', agentId: 'a1' } })
   await ready($, on, 'balanced')
   await $.agent.spawn(SPAWN('omniclaude:luna-researcher', 'opus'))
+  expect(spawned[0].model).toBe('claude-haiku-5-5')
+})
+
+test('agent.spawn passes a request within the worker tier through as given', async ($, on) => {
+  const spawned: any[] = []
+  on('agent.spawn', async (_$, e) => { spawned.push(e); return { model: e.model ?? 'inherit', agentId: 'a1' } })
+  await ready($, on, 'balanced')
+  await $.agent.spawn(SPAWN('omniclaude:terra-explorer', 'haiku'))
   expect(spawned[0].model).toBe('haiku')
 })
 
@@ -190,7 +199,7 @@ test('auto with no plan pins the main loop to opus/medium', async ($, on) => {
   on('turn.step', async function* (_$, e) { sent = e; return STEP_RESULT(e) })
   await ready($, on, 'auto')
   await drain($.turn.step(STEP('claude-sonnet-5-5', 'low')))
-  expect(sent.model).toBe('opus')
+  expect(sent.model).toBe('claude-opus-5-5')
   expect(sent.effort).toBe('medium')
   expect(await status($)).toContain('OmniClaude auto')
 })
@@ -212,9 +221,9 @@ test('a 1M-context main loop keeps its [1m] window on opus and sonnet', async ($
   on('turn.step', async function* (_$, e) { seen.push(e); return STEP_RESULT(e) })
   await ready($, on, 'balanced')
   await drain($.turn.step(STEP('claude-sonnet-5-5[1m]', 'high')))
-  expect(seen[0].model).toBe('opus[1m]')
+  expect(seen[0].model).toBe('claude-opus-5-5[1m]')
   expect(seen[0].effort).toBe('medium')
-  expect(await status($)).toContain('applied (last step): opus[1m]/medium')
+  expect(await status($)).toContain('applied (last step): claude-opus-5-5[1m]/medium')
 })
 
 test('a step already on the profile tier and effort is sent unchanged', async ($, on) => {
@@ -240,12 +249,12 @@ test('a step on the profile tier keeps its model id and gets only the effort', a
   expect(seen[1].effort).toBe('medium')
 })
 
-test('a step on another tier is rewritten to the profile alias', async ($, on) => {
+test('a step on another tier is rewritten to the profile tier\'s full id', async ($, on) => {
   const seen: any[] = []
   on('turn.step', async function* (_$, e) { seen.push(e); return STEP_RESULT(e) })
   await ready($, on, 'economy')
   await drain($.turn.step(STEP('claude-opus-5-5', 'medium')))
-  expect(seen[0].model).toBe('sonnet')
+  expect(seen[0].model).toBe('claude-sonnet-5-5')
   expect(seen[0].effort).toBe('medium')
 })
 
@@ -274,7 +283,7 @@ test('a step whose hook fails leaves no applied record from an earlier step', as
   on('turn.step', async function* (_$, e) { return STEP_RESULT(e) })
   await $.session.start({ cwd: 'C:/CC/omniclaude', surface: null, isInteractive: false })
   await drain($.turn.step(STEP('claude-sonnet-5-5', 'high')))
-  expect(await status($)).toContain('applied (last step): opus/medium')
+  expect(await status($)).toContain('applied (last step): claude-opus-5-5/medium')
   storeDown = true
   await drain($.turn.step(STEP('claude-sonnet-5-5', 'high')))
   expect(statuses[statuses.length - 1]).toBe('omni:? · not applied (hook error)')
@@ -292,8 +301,8 @@ test('engine built-ins other than Explore, Plan and general-purpose keep their o
   await $.agent.spawn({ ...SPAWN('Explore'), provider: ENGINE } as any)
   await $.agent.spawn({ ...SPAWN('general-purpose'), provider: ENGINE } as any)
   expect(spawned[0].model).toBeUndefined()
-  expect(spawned[1].model).toBe('sonnet')
-  expect(spawned[2].model).toBe('opus')
+  expect(spawned[1].model).toBe('claude-sonnet-5-5')
+  expect(spawned[2].model).toBe('claude-opus-5-5')
 })
 
 test('a workflow agent of a routed type is passed through untouched', async ($, on) => {
@@ -310,7 +319,7 @@ test('/omni status shows the last spawn and the model it was sent', async ($, on
   await ready($, on, 'economy')
   expect(await status($)).toContain('last spawn: none yet')
   await $.agent.spawn(SPAWN('Explore'))
-  expect(await status($)).toContain('last spawn: Explore → haiku')
+  expect(await status($)).toContain('last spawn: Explore → claude-haiku-5-5')
   await $.agent.spawn({ ...SPAWN('fork'), fork: true } as any)
   expect(await status($)).toContain('last spawn: fork → unchanged')
 })
@@ -324,19 +333,19 @@ test('astra-expert under another plugin name is gated too', async ($, on) => {
   expect(spawned.length).toBe(0)
 })
 
-test('a 1M-context main loop under economy gets sonnet[1m]', async ($, on) => {
+test('a 1M-context main loop under economy gets claude-sonnet-5-5[1m]', async ($, on) => {
   const seen: any[] = []
   on('turn.step', async function* (_$, e) { seen.push(e); return STEP_RESULT(e) })
   await ready($, on, 'economy')
   await drain($.turn.step(STEP('claude-opus-5-5[1m]', 'high')))
-  expect(seen[0].model).toBe('sonnet[1m]')
+  expect(seen[0].model).toBe('claude-sonnet-5-5[1m]')
 })
 
-test('fable has no [1m] alias: max sends the bare alias even from a 1M session', async ($, on) => {
+test('fable has no [1m] form: max sends the plain fable id even from a 1M session', async ($, on) => {
   const seen: any[] = []
   on('turn.step', async function* (_$, e) { seen.push(e); return STEP_RESULT(e) })
   await ready($, on, 'max')
   await drain($.turn.step(STEP('claude-opus-5-5[1m]', 'high')))
-  expect(seen[0].model).toBe('fable')
+  expect(seen[0].model).toBe('claude-fable-5-1')
   expect(seen[0].effort).toBe('high')
 })

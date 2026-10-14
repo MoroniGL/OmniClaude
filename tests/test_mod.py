@@ -26,6 +26,21 @@ class ModTests(unittest.TestCase):
         agents = {path.stem: parse(path)[0]["model"] for path in (PLUGIN / "agents").glob("*.md")}
         self.assertEqual(tiers, agents)
 
+    def test_tier_ids_are_the_full_ids_the_engine_accepts(self) -> None:
+        policy = (HOOKS / "policy.ts").read_text(encoding="utf-8")
+        block = re.search(r"export const TIER_IDS[^=]*=\s*\{(.*?)\}", policy, re.S)
+        self.assertIsNotNone(block, "policy.ts must declare TIER_IDS as an object literal")
+        ids = dict(re.findall(r"(\w+):\s*'([^']+)'", block.group(1)))
+        self.assertEqual(
+            ids,
+            {
+                "haiku": "claude-haiku-5-5",
+                "sonnet": "claude-sonnet-5-5",
+                "opus": "claude-opus-5-5",
+                "fable": "claude-fable-5-1",
+            },
+        )
+
     def test_hooks_module_declared(self) -> None:
         hooks = json.loads((PLUGIN / "hooks" / "hooks.json").read_text(encoding="utf-8"))
         self.assertEqual(hooks, {"modules": ["./register.ts"]})

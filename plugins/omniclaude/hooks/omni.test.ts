@@ -84,8 +84,8 @@ test('a session override steers agent.spawn routing, and reset returns to the sa
   await $.agent.spawn(spawn)
   await omni($, 'reset')
   await $.agent.spawn(spawn)
-  expect(spawned[0].model).toBe('haiku')
-  expect(spawned[1].model).toBe('sonnet')
+  expect(spawned[0].model).toBe('claude-haiku-5-5')
+  expect(spawned[1].model).toBe('claude-sonnet-5-5')
 })
 
 test('/omni save persists the profile without touching the session override', async ($, on) => {

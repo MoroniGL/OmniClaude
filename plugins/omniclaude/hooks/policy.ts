@@ -6,6 +6,14 @@ export type AutoClass = 'trivial' | 'routine' | 'complex' | 'critical'
 
 export const TIER_RANK: Record<Tier, number> = { haiku: 0, sonnet: 1, opus: 2, fable: 3 }
 
+// turn.step rejects aliases (live: unrecognized_model {model:'opus'}); send full ids.
+export const TIER_IDS: Record<Tier, string> = { haiku: 'claude-haiku-5-5', sonnet: 'claude-sonnet-5-5', opus: 'claude-opus-5-5', fable: 'claude-fable-5-1' }
+
+/** The full model id the engine accepts for a tier; opus and sonnet keep a 1M window as `[1m]` (haiku and fable have none). */
+export function modelIdFor(tier: Tier, keep1m: boolean): string {
+  return keep1m && (tier === 'opus' || tier === 'sonnet') ? `${TIER_IDS[tier]}[1m]` : TIER_IDS[tier]
+}
+
 export const PROFILES: Record<FixedProfile, { parent: { model: Tier; effort: Effort }; explore: Tier; general: Tier }> = {
   economy: { parent: { model: 'sonnet', effort: 'medium' }, explore: 'haiku', general: 'sonnet' },
   balanced: { parent: { model: 'opus', effort: 'medium' }, explore: 'sonnet', general: 'sonnet' },
@@ -59,12 +67,11 @@ export function spawnProfile(profile: Profile): FixedProfile {
 
 /**
  * The model a main-loop step is sent: the engine's own id when its tier already matches (no rewrite),
- * else the profile alias, keeping a 1M window on opus/sonnet (haiku and fable have no `[1m]` alias).
+ * else the target tier's full id, keeping a 1M window on opus/sonnet (haiku and fable have no `[1m]` form).
  */
 export function mainLoopModel(engineModel: string, target: Tier): string {
   if (tierOf(engineModel) === target) return engineModel
-  const keepsWindow = engineModel.trim().toLowerCase().endsWith('[1m]') && (target === 'opus' || target === 'sonnet')
-  return keepsWindow ? `${target}[1m]` : target
+  return modelIdFor(target, engineModel.trim().toLowerCase().endsWith('[1m]'))
 }
 
 export const ASTRA = 'omniclaude:astra-expert'
@@ -82,12 +89,13 @@ export function routesSpawn(subagentType: string, providerPlugin: string | undef
   return providerPlugin !== 'engine' || ROUTED_ENGINE_AGENTS.includes(subagentType)
 }
 
+/** A request within the tier is passed through as given; one above it (or one the policy cannot place) becomes the tier's full id. */
 export function clampWorkerModel(workerTier: Tier, requested: string | undefined, profile: Profile): string | undefined {
   if (requested === undefined) return undefined
   if (profile === 'max') return requested
   const requestedTier = tierOf(requested)
-  if (requestedTier === undefined) return workerTier
-  return TIER_RANK[requestedTier] > TIER_RANK[workerTier] ? workerTier : requested
+  if (requestedTier === undefined) return TIER_IDS[workerTier]
+  return TIER_RANK[requestedTier] > TIER_RANK[workerTier] ? TIER_IDS[workerTier] : requested
 }
 
 // `agentModel` is unused: the engine does not expose a third-party agent's own frontmatter model, so every non-OmniClaude spawn is routed by profile.
@@ -101,8 +109,8 @@ export function spawnModel(
     return clampWorkerModel(WORKER_TIERS[subagentType], requested, profile)
   }
   const tier = subagentType === 'Explore' ? PROFILES[profile].explore : PROFILES[profile].general
-  if (requested === undefined) return tier
-  return profile === 'max' ? requested : (clampWorkerModel(tier, requested, profile) ?? tier)
+  if (requested === undefined) return TIER_IDS[tier]
+  return profile === 'max' ? requested : (clampWorkerModel(tier, requested, profile) ?? TIER_IDS[tier])
 }
 
 export function planForClass(c: AutoClass): { model: Tier; effort: Effort } {

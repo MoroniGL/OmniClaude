@@ -38,6 +38,8 @@ test('the policy section says what is routed and what is not', async ($, on) => 
   const text: string = composed.sections.find((s: any) => s.id === 'omniclaude:policy').text
   expect(text).toContain('OmniClaude (omni:economy) is active')
   expect(text).toContain('keep their own tiers')
+  expect(text).toContain('left alone')
+  expect(text).toContain('clamped back')
   expect(text).toContain('forks, teammates and workflow agents are not routed')
   expect(text).toContain('omniclaude:terra-explorer')
   expect(text).toContain('omniclaude:luna-researcher')
@@ -48,8 +50,8 @@ test('the policy section says what is routed and what is not', async ($, on) => 
   expect(text).toBe(POLICY.replace('<profile>', 'economy'))
 })
 
-// The wording the final review fixed, verbatim.
-const POLICY = "OmniClaude (omni:<profile>) is active: a plugin hook sets this conversation's model and effort from the profile and routes Explore, Plan, general-purpose and other non-OmniClaude subagents to its tiers; OmniClaude workers (omniclaude:luna-researcher, omniclaude:terra-explorer, omniclaude:terra-implementer, omniclaude:sol-*) keep their own tiers; forks, teammates and workflow agents are not routed. Prefer omniclaude:terra-explorer for codebase mapping and omniclaude:luna-researcher for docs/search instead of reading many files yourself; use omniclaude:terra-implementer for bounded implementation; keep tiny single-file work here. omniclaude:astra-expert is refused until the user agrees (/omni astra allow, or the max profile). Details: the omniclaude:routing skill."
+// The wording the final re-review fixed, verbatim.
+const POLICY = "OmniClaude (omni:<profile>) is active: a plugin hook sets this conversation's model and effort from the profile and routes Explore, Plan, general-purpose and other plugins' subagents to its tiers (other engine built-ins are left alone); OmniClaude workers (omniclaude:luna-researcher, omniclaude:terra-explorer, omniclaude:terra-implementer, omniclaude:sol-*) keep their own tiers (a higher request is clamped back except under max); forks, teammates and workflow agents are not routed. Prefer omniclaude:terra-explorer for codebase mapping and omniclaude:luna-researcher for docs/search instead of reading many files yourself; use omniclaude:terra-implementer for bounded implementation; keep tiny single-file work here. omniclaude:astra-expert is refused until the user agrees (/omni astra allow, or the max profile). Details: the omniclaude:routing skill."
 
 test('the policy section follows the session override and stays short', async ($, on) => {
   on('prompt.compose', () => ({ sections: [] }))

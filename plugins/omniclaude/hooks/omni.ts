@@ -63,8 +63,8 @@ export function saveNote(profile: Profile, override: unknown): string {
 /** The session-scoped system-prompt section: what the hooks route, what they do not, and when to delegate. */
 export function policySection(profile: Profile): string {
   return [
-    `OmniClaude (omni:${profile}) is active: a plugin hook sets this conversation's model and effort from the profile and routes Explore, Plan, general-purpose and other non-OmniClaude subagents to its tiers;`,
-    'OmniClaude workers (omniclaude:luna-researcher, omniclaude:terra-explorer, omniclaude:terra-implementer, omniclaude:sol-*) keep their own tiers; forks, teammates and workflow agents are not routed.',
+    `OmniClaude (omni:${profile}) is active: a plugin hook sets this conversation's model and effort from the profile and routes Explore, Plan, general-purpose and other plugins' subagents to its tiers (other engine built-ins are left alone);`,
+    'OmniClaude workers (omniclaude:luna-researcher, omniclaude:terra-explorer, omniclaude:terra-implementer, omniclaude:sol-*) keep their own tiers (a higher request is clamped back except under max); forks, teammates and workflow agents are not routed.',
     'Prefer omniclaude:terra-explorer for codebase mapping and omniclaude:luna-researcher for docs/search instead of reading many files yourself; use omniclaude:terra-implementer for bounded implementation; keep tiny single-file work here.',
     'omniclaude:astra-expert is refused until the user agrees (/omni astra allow, or the max profile). Details: the omniclaude:routing skill.',
   ].join(' ')

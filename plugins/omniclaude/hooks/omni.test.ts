@@ -328,3 +328,13 @@ test('an unknown /omni argument prints help and changes nothing', async ($, on) 
   expect(text).toContain('session override: none')
   expect(text).toContain('astra consent: no')
 })
+
+test('a failed read of OMNICLAUDE_PROFILE does not hide EVAL_OMNICLAUDE_PROFILE', async ($, on) => {
+  // Our own env bottom (not mock.env): it refuses the first name and answers the second.
+  on('env.get', async (_$: any, e: any) => {
+    if (e.name === 'OMNICLAUDE_PROFILE') return { deny: 'x' }
+    return { value: e.name === 'EVAL_OMNICLAUDE_PROFILE' ? 'economy' : undefined }
+  })
+  await ready($, on, {})
+  expect(await omni($, 'status')).toContain('OmniClaude economy (env EVAL_OMNICLAUDE_PROFILE: economy)')
+})

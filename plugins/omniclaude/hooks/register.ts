@@ -23,13 +23,18 @@ const ASTRA_DENY = 'astra-expert needs your agreement: run /omni astra allow'
 
 /** OMNICLAUDE_PROFILE, else EVAL_OMNICLAUDE_PROFILE (what a `plugin eval` child inherits); a value that is no profile, or a read that fails, counts as unset. */
 async function envProfile($: EngineInterface): Promise<EnvProfile | undefined> {
+  // Each read has its own guard: a failure of the first must not hide the second.
   try {
     const plain = await $.env.get('OMNICLAUDE_PROFILE')
     if (isProfile(plain)) return { name: 'OMNICLAUDE_PROFILE', profile: plain }
+  } catch {
+    // unreadable counts as unset
+  }
+  try {
     const evalled = await $.env.get('EVAL_OMNICLAUDE_PROFILE')
     if (isProfile(evalled)) return { name: 'EVAL_OMNICLAUDE_PROFILE', profile: evalled }
   } catch {
-    // no environment reading: fall through to the config option
+    // unreadable counts as unset: fall through to the config option
   }
   return undefined
 }
@@ -256,7 +261,8 @@ export const register: Register = (on, options) => {
       model = spawnModel(spawnProfile(await resolveProfile($, optionProfile)), e.subagentType, undefined, e.model)
     }
     const spawn: LastSpawn = { subagentType: e.subagentType, model: model ?? null }
-    await $.state.set(LAST_SPAWN, spawn)
+    // The record is informational: a failed write must never deny the spawn (best effort).
+    await $.state.set(LAST_SPAWN, spawn).catch(() => undefined)
     return model === undefined ? next(e) : next({ ...e, model })
   }).catch(($, e, next) => (next.called ? next(e) : { deny: 'omniclaude: its spawn guard failed; refusing to be safe' }))
 

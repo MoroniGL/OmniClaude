@@ -324,6 +324,18 @@ test('/omni status shows the last spawn and the model it was sent', async ($, on
   expect(await status($)).toContain('last spawn: fork → unchanged')
 })
 
+test('a refused write of the spawn record never denies the spawn', async ($, on) => {
+  const spawned: any[] = []
+  on('agent.spawn', async (_$, e) => { spawned.push(e); return { model: e.model ?? 'inherit', agentId: 'a1' } })
+  // Our own state bottom: it refuses only the lastSpawn key.
+  on('state.set', async (_$: any, e: any) => (e.key === 'lastSpawn' ? { deny: 'boom' } : { value: undefined }))
+  await ready($, on, 'economy')
+  const result: any = await $.agent.spawn(SPAWN('Explore'))
+  expect(result.deny).toBeUndefined()
+  expect(spawned.length).toBe(1)
+  expect(spawned[0].model).toBe('claude-haiku-5-5')
+})
+
 test('astra-expert under another plugin name is gated too', async ($, on) => {
   const spawned: any[] = []
   on('agent.spawn', async (_$, e) => { spawned.push(e); return { model: e.model ?? 'inherit', agentId: 'a1' } })

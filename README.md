@@ -52,54 +52,126 @@ Run `/reload-plugins` or start a new session afterwards.
 
 ## Use
 
-Work as usual. On substantial tasks the routing skill asks Claude to delegate bounded phases; whether it does is Claude's choice (see Honest limits). You can also ask for a worker directly, for example *"use omniclaude:terra-explorer to map the checkout flow"* or `@agent-omniclaude:sol-reviewer`.
+Work as usual. On substantial tasks the routing skill and the mod's short routing-policy text ask Claude to delegate bounded phases; whether it does is Claude's choice (see Honest limits). You can also ask for a worker directly, for example *"use omniclaude:terra-explorer to map the checkout flow"* or `@agent-omniclaude:sol-reviewer`.
 
-`/tasks` names the model on each subagent's row and the effort level set for it.
+`/tasks` names the model on each subagent's row and the effort level set for it. `/omni status` shows what the mod requested, applied and verified for the main conversation.
+
+## Stage 2: the enforcing mod
+
+The plugin ships a mod: a hooks module (`plugins/omniclaude/hooks/`) that Claude Code loads on engine 2.1.287 or later. Where Stage 1 asked Claude to route, the mod sets the model and effort itself.
+
+**What the mod applies**
+
+- **The main conversation:** the profile's model and effort on every main-loop request. A parent on a 1M-context alias keeps it (`opus[1m]` and `sonnet[1m]` exist); Fable and Haiku have no 1M alias, so under `max` the mod sends plain `fable`.
+- **Subagents:** Explore gets the profile's explore tier; Plan, general-purpose and any subagent whose caller did not pin a model get the profile's general tier; an explicit `model` request on a non-OmniClaude agent is clamped to the profile tier, except under `max`. OmniClaude workers keep their frontmatter tier, and a higher request is clamped back (except under `max`). The tables are under Profiles.
+- **astra-expert consent:** denied with `astra-expert needs your agreement: run /omni astra allow` unless you ran that command or the profile is `max`. Consent that `max` grants is cleared when you leave `max`; consent you gave with `/omni astra allow` survives profile changes.
+- **Routing policy:** one short, session-scoped section added to the system prompt, so the policy reaches every request without the skill being invoked. It does not force Claude to delegate.
+
+**What the mod does not touch:** forks, teammates and workflow agents (only the astra consent gate applies to them), the effort of subagent loops (the worker's own frontmatter applies), and whether Claude chooses to delegate at all.
+
+**`/omni` commands.** Answers are text only; nothing enters the model's context.
+
+| Command | Effect |
+|---|---|
+| `/omni status` | effective profile, saved profile, session override, requested / applied / verified, last `auto` classification, astra consent |
+| `/omni <profile>` | session override (`economy`, `balanced`, `quality`, `max`, `auto`); takes effect from the next step; `max` also prints a warning that Fable may bill usage credits |
+| `/omni save <profile>` | saves the profile in the plugin's own store (not in `settings.json`) for future sessions |
+| `/omni reset` | clears the session override |
+| `/omni astra allow` / `deny` | grants or revokes astra-expert consent for this session |
+| `/omni doctor` | engine version, a list of the mod's main hooks, and the reasons `/omni` can be missing |
+
+The profile in force is, in order: the session override, the saved profile, the `/config` picker "Routing profile", then `auto`. The saved profile wins over the picker.
+
+**`omni:auto`** (the picker's default). Each prompt you type is classified by a small model call (`$.model.classify`) into `trivial`, `routine`, `complex` or `critical`; notifications and prompts from other agents are left alone.
+
+| Class | Effort | Model |
+|---|---|---|
+| `trivial` | low | Sonnet |
+| `routine` | medium | Sonnet |
+| `complex` | medium | Opus |
+| `critical` | high | Opus |
+
+- Effort follows the class on every prompt.
+- Cache rule: switching the parent model drops the prompt cache, changing effort keeps it. So the model is chosen at the first classified prompt, and a later upgrade (Sonnet to Opus) happens only while the context is below 40,000 tokens. Above that, the model is kept and effort is raised to `high`. The model is never downgraded mid-session.
+- A prompt the classifier cannot label, or a classifier request that fails, keeps the previous plan and says so in `/omni status`.
+- The last classification shows in `/omni status`. The status-line badge reads `omni:auto · <class> → <model>/<effort>` during a turn.
+- Cost: one small completion per prompt you type. Its latency has not yet been measured on a live session.
+
+**Three levels of honesty**
+
+| Level | What it is | Where |
+|---|---|---|
+| requested | what the profile (or the `auto` plan) asks for | `/omni status`, "requested parent" |
+| applied | what the mod actually sent for the step | `/omni status`, "applied (last step)" |
+| verified | the model id the API reports for the finished turn (`turn.complete.usage.model`) | `/omni status`, "verified (last turn, API-reported)"; the badge ends in a check mark when the verified tier matches the applied tier, and in `≠ <model>` otherwise |
+
+Verified covers the main conversation only. For subagents, `/tasks` and the subagent transcripts remain the evidence.
+
+**When the mod is off.** With `--bare`, `--safe-mode`, `disableAllHooks`, `allowManagedModsOnly`, a remote rollout switch, or an engine older than 2.1.287, the mod does not load and `/omni` is absent. The Stage 1 routing skill, the seven workers and the `--settings` profile files still work, as advisory routing only.
+
+**Not yet live-verified:**
+
+- that the engine accepts the alias strings the mod sends (`opus`, `sonnet[1m]`, and so on) in a main-loop step; until it is, treat "applied" as what the mod sent and check "verified";
+- the latency of the `auto` classifier call;
+- the Stage 2 eval result. No savings are claimed.
 
 ## Profiles
 
-A profile sets the parent model and effort. Worker tiers are the same in every profile. See [profiles](docs/profiles.md).
+A profile sets what the mod applies: the parent's model and effort, the tier of subagents that have no model of their own, and whether astra-expert needs consent. Choose one with `/omni`, `/omni save`, or the `/config` picker "Routing profile". Profile names are shown as `omni:<name>`; commands use the bare name. See [profiles](docs/profiles.md).
 
-| Profile | Parent | Effort | Unassigned subagents |
-|---|---|---|---|
-| `omni:economy` | Sonnet | medium | inherit |
-| `omni:balanced` | Opus | medium | Sonnet |
-| `omni:quality` | Opus | high | inherit |
-| `omni:max` | Fable | high | Opus |
+| Profile | Parent (every main-loop request) | Explore | Plan, general-purpose, other model-less subagents | astra-expert |
+|---|---|---|---|---|
+| `omni:economy` | Sonnet / medium | Haiku | Sonnet | denied until `/omni astra allow` |
+| `omni:balanced` | Opus / medium | Sonnet | Sonnet | denied until `/omni astra allow` |
+| `omni:quality` | Opus / high | Sonnet | Opus | denied until `/omni astra allow` |
+| `omni:max` | Fable / high | Opus | Opus | allowed; `max` counts as consent, and Fable may bill usage credits |
+| `omni:auto` (default) | per prompt, from the classifier (Opus / medium until the first prompt is classified) | as `balanced` | as `balanced` | denied until `/omni astra allow` |
 
-The 'Unassigned subagents' column relies on `env.CLAUDE_CODE_SUBAGENT_MODEL` in the profile file, which is not yet verified live (see anthropics/claude-code#43869).
+Worker tiers are the same in every profile (luna Haiku, terra Sonnet, sol Opus, astra Fable).
 
-**CLI:** copy a profile file from `plugins/omniclaude/profiles/` to a stable location, then run:
+**Sessions without the mod.** The `--settings` files in `plugins/omniclaude/profiles/` remain for them. They set the parent's model and effort for one CLI session; nothing clamps subagents:
 
 ```sh
 claude --settings ~/omniclaude-profiles/balanced.settings.json
 ```
 
-**Desktop app:** it has no `--settings` equivalent. Choose the parent with `/model`, and the effort with `/effort` (Ctrl+Shift+E). Persisted profiles and in-session `/omni` control are planned for Stage 2.
+Copy a profile file from `plugins/omniclaude/profiles/` to a stable location first. The balanced and max files also set `env.CLAUDE_CODE_SUBAGENT_MODEL` for unassigned subagents; that is not yet verified live (see anthropics/claude-code#43869). The desktop app has no `--settings` equivalent: if the mod is off, choose the parent with `/model` and the effort with `/effort` (Ctrl+Shift+E).
 
 `omni:max` is a profile name. It does not mean effort `max` or the Max plan.
 
+### Optional: the advisor
+
+Not measured, and not automated by OmniClaude. Claude Code has an experimental advisor feature (official docs, checked 2026-10-14): a stronger model the main model can consult.
+
+- Set it with `/advisor opus`, the `advisorModel` setting, or `--advisor`. It works on the Anthropic API only (subscriptions included).
+- Claude decides when to consult it, and the advisor reads the whole conversation on each call, billed at its own rates.
+- A Sonnet 5.5 parent accepts Fable, Opus 5 or later, and Sonnet 5.5 advisors. Subagents inherit the advisor. Fable as an advisor needs usage-credit consent.
+
+One combination you could try: `economy` (Sonnet parent) plus `/advisor opus`, a rough analogue of OmniCodex's "Terra control plane, Sol for consequential reasoning". Nobody has measured whether it costs less than a single-model setup, and every advisor call re-reads the conversation, so it may cost more.
+
 ## Honest limits
 
-- **Tiers are requested, not enforced.** Claude can pass its own model or effort on an Agent call.
+- **Tiers are applied by the mod on every spawn it sees; forks, teammates and workflow agents are not rewritten; sessions where the mod is off fall back to advisory routing,** where Claude can pass its own model or effort on an Agent call and nothing clamps it.
+- **Applied is not verified until the API says so.** The mod reports what it sent; the model that answered is read back for the main conversation only. Alias acceptance by the engine is not yet live-verified.
+- **The mod cannot read a custom subagent's own frontmatter model,** so custom subagents are routed by profile like any other subagent whose caller did not pin a model.
 - **'Read-only' and 'no edits' are instructions, not tool restrictions,** for terra-explorer, sol-planner and sol-reviewer, which keep Bash. Only luna-researcher has no shell at all.
-- **Delegation is Claude's choice.** It depends on Claude choosing to delegate, and in the Stage 1 eval no OmniClaude-worker dispatch was observed in the 8 of 14 with-plugin runs that had a counter (scout-call-sites counted only `omniclaude:` matches; tiny-edit and the 2 traced diagnostics counted any Agent call; the other 6 had no general Agent counter); see measured results.
-- **Multi-model setups can cost more** than one model at lower effort. OmniClaude claims savings only from a measured eval.
-- **Other providers degrade the tiers.** On Bedrock, Vertex and Foundry the aliases map to older models, some without effort support.
-- **Fable may bill usage credits** on some plans (Anthropic's support article on Fable access describes Pro and Team Standard seats; check your plan). `astra-expert` never runs without your explicit agreement.
+- **Delegation is still Claude's choice.** The mod adds routing-policy text and fixes tiers, but it does not force delegation. In the Stage 1 eval no OmniClaude-worker dispatch was observed in the 8 of 14 with-plugin runs that had a counter (scout-call-sites counted only `omniclaude:` matches; tiny-edit and the 2 traced diagnostics counted any Agent call; the other 6 had no general Agent counter); the Stage 2 eval has not been run. See measured results.
+- **Multi-model setups can cost more** than one model at lower effort, and `auto` adds one small model call per prompt. OmniClaude claims savings only from a measured eval; the Stage 1 eval found none.
+- **Other providers degrade the tiers.** On Bedrock, Vertex and Foundry the aliases map to older models, some without effort support. How the mod behaves there was not tested.
+- **Fable may bill usage credits** on some plans (Anthropic's support article on Fable access describes Pro and Team Standard seats; check your plan). `astra-expert` does not run until you run `/omni astra allow` or choose `max`, which allows it.
 
 ## Differences from OmniCodex
 
 - Same worker names and roles.
 - luna runs at medium effort, because Haiku 5.5 stops early at low.
 - astra starts at low effort and re-runs at high on failure (again with your agreement), following Anthropic's "next tier at low effort" guidance.
-- astra-expert always asks for your agreement first, even after a sol worker fails.
-- No in-session `omni …` control yet; that is Stage 2.
+- astra-expert always asks for your agreement first, even after a sol worker fails; the mod enforces it with a denial until `/omni astra allow`.
+- In-session control is the `/omni` slash command, not a natural-language `omni ...` parser.
 - No Gemini context offload yet; that is phase 2.
 
 ## Sources
 
-The runtime behavior described here (subagent model precedence, effort levels, pricing, Haiku 5.5 behavior, desktop limits) comes from the official docs, checked on 2026-10-13. Statements not covered by these pages are marked unverified in the text:
+The runtime behavior described here (subagent model precedence, effort levels, pricing, Haiku 5.5 behavior, desktop limits) comes from the official docs, checked on 2026-10-13 (the advisor page on 2026-10-14). Statements not covered by these pages are marked unverified in the text:
 
 - https://code.claude.com/docs/en/sub-agents
 - https://code.claude.com/docs/en/model-config
@@ -109,6 +181,7 @@ The runtime behavior described here (subagent model precedence, effort levels, p
 - https://code.claude.com/docs/en/desktop
 - https://code.claude.com/docs/en/prompt-caching
 - https://code.claude.com/docs/en/discover-plugins
+- https://code.claude.com/docs/en/advisor
 - https://platform.claude.com/docs/en/about-claude/pricing
 - https://platform.claude.com/docs/en/models/overview
 
@@ -118,9 +191,10 @@ The runtime behavior described here (subagent model precedence, effort levels, p
 python -m unittest discover -s tests -v
 claude plugin validate . --strict
 claude plugin validate plugins/omniclaude --strict
+claude plugin test plugins/omniclaude
 ```
 
-The eval suite under `plugins/omniclaude/evals/` compares runs with and without the plugin. See [local validation](docs/local-validation.md).
+`claude plugin test` runs the mod's tests (`plugins/omniclaude/hooks/*.test.ts`). The eval suite under `plugins/omniclaude/evals/` compares runs with and without the plugin. See [local validation](docs/local-validation.md).
 
 ## License
 

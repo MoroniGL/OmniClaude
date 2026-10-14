@@ -132,6 +132,17 @@ export const register: Register = (on, options) => {
     return model === undefined ? next(e) : next({ ...e, model })
   }).catch(($, e, next) => (next.called ? next(e) : { deny: 'omniclaude: its spawn guard failed; refusing to be safe' }))
 
+  on('prompt.compose', async ($, e, next) => {
+    const composed = await next(e)
+    const profile = await resolveProfile($, optionProfile)
+    const text = [
+      `OmniClaude routing (omni:${profile}) is enforced by a plugin hook: your model and effort are set by the profile; subagents run on the profile's tiers.`,
+      `Delegate read-heavy work: use omniclaude:terra-explorer for codebase mapping and omniclaude:luna-researcher for docs/search, instead of reading many files yourself. Use omniclaude:terra-implementer for bounded implementation. Keep tiny single-file work in this conversation.`,
+      `omniclaude:astra-expert runs only after the user agrees (/omni astra allow). For details load the omniclaude:routing skill.`,
+    ].join(' ')
+    return { sections: [...composed.sections, { id: 'omniclaude:policy', text, scope: 'session' }] }
+  })
+
   on('turn.complete', async ($, e, next) => {
     if (e.agentId === undefined) {
       const usedModel = e.usage?.model

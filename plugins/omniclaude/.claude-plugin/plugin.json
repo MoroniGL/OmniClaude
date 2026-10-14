@@ -8,5 +8,15 @@
   "homepage": "https://github.com/MoroniGL/Omniclaude",
   "repository": "https://github.com/MoroniGL/Omniclaude",
   "license": "MIT",
+  "types": "./types/index.d.ts",
+  "userConfig": {
+    "profile": {
+      "type": "string",
+      "title": "Routing profile",
+      "description": "OmniClaude saved profile (/omni save overrides it)",
+      "default": "auto",
+      "options": ["auto", "economy", "balanced", "quality", "max"]
+    }
+  },
   "keywords": ["routing", "cost", "subagents", "orchestration", "omnicodex"]
 }

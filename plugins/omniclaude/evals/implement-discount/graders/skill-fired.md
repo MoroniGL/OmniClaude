@@ -1,0 +1,6 @@
+---
+type: tool_used
+tool: Skill
+min: 0
+arm: with-only
+---

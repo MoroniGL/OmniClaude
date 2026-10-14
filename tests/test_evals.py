@@ -38,6 +38,11 @@ class EvalTests(unittest.TestCase):
                 no_astra = EVALS / case / "graders" / "no-astra.md"
                 self.assertTrue(no_astra.is_file(), "every case must forbid astra-expert")
                 self.assertEqual(parse(no_astra)[0]["type"], "tool_used")
+                # Indicators (min: 0, always pass): their counts in the report show whether delegation and the skill happened.
+                for indicator in ("agent-used.md", "skill-fired.md"):
+                    path = EVALS / case / "graders" / indicator
+                    self.assertTrue(path.is_file(), f"every case must carry {indicator}")
+                    self.assertEqual(parse(path)[0]["type"], "tool_used")
 
     def test_frontmatter_scalars_are_yaml_safe(self) -> None:
         # Claude Code parses this frontmatter as real YAML. An unquoted scalar that ends with ":"

@@ -25,6 +25,24 @@ export const WORKER_TIERS: Record<string, Tier> = {
 
 export const AUTO_UPGRADE_CONTEXT_LIMIT = 40_000
 
+export const AUTO_LABELS = ['trivial', 'routine', 'complex', 'critical'] as const
+
+export function isAutoClass(x: unknown): x is AutoClass {
+  return typeof x === 'string' && (AUTO_LABELS as readonly string[]).includes(x)
+}
+
+/** How long a prompt waits for the classifier before auto keeps its plan. */
+export const CLASSIFIER_TIMEOUT_MS = 2500
+
+/** Why the classifier gave no class: no label, a failed request, or no answer in time. */
+export type ClassifierMiss = 'none' | 'error' | 'timeout'
+
+/** What `/omni status` keeps for a prompt the classifier gave no class: the plan stays either way. */
+export function missedClass(miss: ClassifierMiss): { label: 'none' | 'error'; reason: string } {
+  if (miss === 'none') return { label: 'none', reason: 'classifier gave no label; plan kept' }
+  return { label: 'error', reason: miss === 'timeout' ? 'classifier timed out; plan kept' : 'classifier request failed; plan kept' }
+}
+
 export function tierOf(model: string): Tier | undefined {
   const m = model.trim().toLowerCase().replace(/\[[^\]]*\]$/, '')
   for (const tier of ['haiku', 'sonnet', 'opus', 'fable'] as const) {

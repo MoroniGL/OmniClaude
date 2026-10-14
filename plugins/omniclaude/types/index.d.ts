@@ -4,7 +4,8 @@ export type Tier = 'haiku' | 'sonnet' | 'opus' | 'fable'
 
 export type LastStep = { model: string; effort?: string | number }
 export type Plan = { model: Tier; effort: Effort; source: 'profile' | 'auto'; reason: string }
-export type Applied = { model: string; effort?: string | number }
+// `profile` is the profile the step ran under: auto counts only its own steps as the model whose cache is warm.
+export type Applied = { model: string; effort?: string | number; profile: Profile }
 export type Verified = { model: string }
 // The last subagent spawn the mod decided: `model` is the string it sent, or null when it passed the spawn through unchanged.
 export type LastSpawn = { subagentType: string; model: string | null }

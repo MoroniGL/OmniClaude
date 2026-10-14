@@ -1,9 +1,10 @@
 import type { Register, EngineInterface } from 'claude-code'
 import type { LastClass, LastSpawn, LastStep, Plan, Profile, Applied, Verified } from '../types'
 import {
-  PROFILES, TIER_RANK, decideAutoModel, isAstraType, mainLoopModel, planForClass, routesSpawn, spawnModel, spawnProfile, tierOf,
+  AUTO_LABELS, CLASSIFIER_TIMEOUT_MS, PROFILES, TIER_RANK, decideAutoModel, isAstraType, isAutoClass, mainLoopModel, missedClass,
+  planForClass, routesSpawn, spawnModel, spawnProfile, tierOf,
 } from './policy'
-import type { AutoClass, Effort, Tier } from './policy'
+import type { AutoClass, ClassifierMiss, Effort, Tier } from './policy'
 import { HELP, MAX_WARNING, MAX_WARNING_KEPT, badge, doctorText, formatStatus, isProfile, parseOmni, policySection, saveNote } from './omni'
 import type { EnvProfile, OmniCommand } from './omni'
 
@@ -54,29 +55,38 @@ export async function parentTarget($: EngineInterface, profile: Profile): Promis
   return plan ? { model: plan.model, effort: plan.effort } : PROFILES.balanced.parent
 }
 
-const AUTO_LABELS = ['trivial', 'routine', 'complex', 'critical'] as const
+const TIMED_OUT = Symbol('classifier timed out')
 
-function isAutoClass(x: unknown): x is AutoClass {
-  return typeof x === 'string' && (AUTO_LABELS as readonly string[]).includes(x)
-}
-
-/** The class the small model names for a prompt; `none` when it names none of the four labels, `error` when the request fails. */
-export async function classifyPrompt($: EngineInterface, text: string): Promise<AutoClass | 'none' | 'error'> {
+/** The class the small model names for a prompt: `none` for none of the four labels, `error` for a failed request, `timeout` after 2.5 s. */
+export async function classifyPrompt($: EngineInterface, text: string): Promise<AutoClass | ClassifierMiss> {
+  const stop = new AbortController()
+  // An aborted wait (or a clock that fails) never settles, so only a real timeout can win the race.
+  const late = $.clock.sleep(CLASSIFIER_TIMEOUT_MS, { signal: stop.signal }).then(() => TIMED_OUT, () => new Promise<never>(() => {}))
   try {
-    const label = await $.model.classify(text.slice(0, 4000), AUTO_LABELS)
+    const label = await Promise.race([$.model.classify(text.slice(0, 4000), AUTO_LABELS), late])
+    if (label === TIMED_OUT) return 'timeout'
     return isAutoClass(label) ? label : 'none'
   } catch {
     return 'error'
+  } finally {
+    stop.abort()
   }
 }
 
-/** Tokens in the live context window. A reading that fails counts as 0: the cheap re-cache assumption, so auto may still upgrade. */
+/** Tokens in the live context window: none reported counts as 0; a reading that fails counts as full, so the model is kept (with high effort). */
 async function contextTokens($: EngineInterface): Promise<number> {
   try {
     return (await $.session.usage()).context.tokens ?? 0
   } catch {
-    return 0
+    return Number.POSITIVE_INFINITY
   }
+}
+
+/** A plan (and its class) made under another profile must not steer auto: both go when the effective profile changed. */
+async function forgetPlanIfSwitched($: EngineInterface, before: Profile, optionProfile: unknown): Promise<void> {
+  if ((await resolveProfile($, optionProfile)) === before) return
+  await $.state.set(PLAN, null)
+  await $.state.set(LAST_CLASS, null)
 }
 
 /** Consent that max gave goes away when the effective profile leaves max; an explicit `/omni astra allow` stays. */
@@ -99,6 +109,7 @@ async function grantMaxConsent($: EngineInterface): Promise<string> {
 
 /** After set/save/reset: entering max (or asking for it) grants its consent with a warning; any other profile takes max's consent back. */
 async function afterSwitch($: EngineInterface, ctx: OmniContext, askedMax: boolean, note: string): Promise<string> {
+  await forgetPlanIfSwitched($, ctx.before, ctx.optionProfile)
   const after = await resolveProfile($, ctx.optionProfile)
   let warning = ''
   if (after !== 'max') await dropMaxConsent($)
@@ -183,17 +194,18 @@ export const register: Register = (on, options) => {
     if (e.origin.kind !== 'composer') return next(e)
     if ((await resolveProfile($, optionProfile)) !== 'auto') return next(e)
     const klass = await classifyPrompt($, e.text)
-    if (klass === 'none' || klass === 'error') {
-      const missed: LastClass = { label: klass, reason: klass === 'none' ? 'classifier gave no label; plan kept' : 'classifier request failed; plan kept' }
+    if (!isAutoClass(klass)) {
+      const missed: LastClass = missedClass(klass)
       await $.state.set(LAST_CLASS, missed)
-      $.ui.status('omni:auto · classifier gave no label; plan kept')
+      $.ui.status(`omni:auto · ${missed.reason}`)
       return next(e)
     }
     const wish = planForClass(klass)
     const { value: previous } = await $.state.get(PLAN)
     const { value: applied } = await $.state.get(APPLIED)
-    // The model the engine last ran on is the one whose cache is warm; the plan's only stands in before any step ran.
-    const current = (applied ? tierOf(applied.model) : undefined) ?? previous?.model ?? null
+    // The model auto last ran on is the one whose cache is warm; a fixed profile's step does not count, and the plan's model stands in before any auto step ran.
+    const autoApplied = applied?.profile === 'auto' ? tierOf(applied.model) : undefined
+    const current = autoApplied ?? previous?.model ?? null
     const decided = decideAutoModel(current, wish.model, await contextTokens($))
     // A model held back to keep the cache makes up for it with high effort.
     const keptForCache = TIER_RANK[wish.model] > TIER_RANK[decided.model]
@@ -215,7 +227,7 @@ export const register: Register = (on, options) => {
       const target = await parentTarget($, resolved)
       const model = mainLoopModel(e.model, target.model)
       const seen: LastStep = e.effort === undefined ? { model: e.model } : { model: e.model, effort: e.effort }
-      const applied: Applied = { model, effort: target.effort }
+      const applied: Applied = { model, effort: target.effort, profile: resolved }
       await $.state.set(LAST_STEP, seen)
       await $.state.set(APPLIED, applied)
       const { value: lastClass } = await $.state.get(LAST_CLASS)

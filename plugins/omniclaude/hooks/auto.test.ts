@@ -2,12 +2,13 @@ import { test, expect, mock } from 'claude-code/testing'
 
 // What the test's bottom hooks answer, changed between prompts: the classifier's reply and the context fill.
 type Rig = {
-  label: string | 'FAIL'
-  tokens: number | 'FAIL'
+  label: string | 'FAIL' | 'HANG'
+  tokens: number | 'FAIL' | 'NONE'
   statuses: string[]
   classified: number
   classifyInputs: string[]
   submitted: string[]
+  clock: any
 }
 
 const STEP = { turnId: 't1', index: 0, model: 'claude-sonnet-5-5', effort: 'medium' as const, messageCount: 1 }
@@ -16,7 +17,8 @@ const STEP = { turnId: 't1', index: 0, model: 'claude-sonnet-5-5', effort: 'medi
 // request, which rejects). A bottom on model.complete is not reached: the harness stands in for the engine at the classify op.
 // The test's `$` has no state noun, so the plan is read back through /omni status.
 async function ready($: any, on: any, store: Record<string, unknown> = { profile: 'auto' }): Promise<Rig> {
-  const rig: Rig = { label: 'routine', tokens: 0, statuses: [], classified: 0, classifyInputs: [], submitted: [] }
+  // The classifier races a 2.5 s wait on $.clock; the mocked clock moves only when a test advances it.
+  const rig: Rig = { label: 'routine', tokens: 0, statuses: [], classified: 0, classifyInputs: [], submitted: [], clock: mock.clock(on) }
   mock.store(on, store)
   on('session.start', async (_$: any, e: any) => ({ cwd: e.cwd }))
   on('command.register', async (_$: any, e: any) => ({ value: { command: e.name } }))
@@ -25,10 +27,13 @@ async function ready($: any, on: any, store: Record<string, unknown> = { profile
   on('model.classify', async (_$: any, e: any) => {
     rig.classified += 1
     rig.classifyInputs.push(String(e.text))
+    // HANG: a classifier that never answers
+    if (rig.label === 'HANG') return new Promise(() => {})
     return rig.label === 'FAIL' ? { deny: 'classifier unavailable' } : { value: rig.label }
   })
   on('session.usage', async () => {
     if (rig.tokens === 'FAIL') return { deny: 'usage unavailable' }
+    if (rig.tokens === 'NONE') return { value: { startedAt: 0, context: { window: 200_000 }, rateLimits: [] } }
     return { value: { startedAt: 0, context: { tokens: rig.tokens, window: 200_000 }, rateLimits: [] } }
   })
   on('prompt.submit', async (_$: any, e: any) => { rig.submitted.push(String(e.text)); return { text: e.text } })
@@ -115,8 +120,54 @@ test('a classifier request that fails keeps the previous plan and says so', asyn
   await $.prompt.submit(SUBMIT('plan the migration'))
   rig.label = 'FAIL'
   await $.prompt.submit(SUBMIT('anything'))
-  expect(rig.statuses[rig.statuses.length - 1]).toBe('omni:auto · classifier gave no label; plan kept')
+  expect(rig.statuses[rig.statuses.length - 1]).toBe('omni:auto · classifier request failed; plan kept')
   expect(await parent($)).toContain('requested parent: opus/medium (auto: complex: first prompt)')
+})
+
+test('a classifier that does not answer within 2.5 s times out and keeps the plan', async ($, on) => {
+  const rig = await ready($, on)
+  rig.label = 'routine'
+  await $.prompt.submit(SUBMIT('add a unit test for parseOmni'))
+  rig.label = 'HANG'
+  const pending = $.prompt.submit(SUBMIT('anything'))
+  await rig.clock.settle()
+  await rig.clock.advance(2500)
+  await pending
+  expect(rig.statuses[rig.statuses.length - 1]).toBe('omni:auto · classifier timed out; plan kept')
+  const text = await status($)
+  expect(text).toContain('auto classifier (last prompt): error — classifier timed out; plan kept')
+  expect(text).toContain('requested parent: sonnet/medium (auto: routine: first prompt)')
+})
+
+test('a fixed profile\'s model does not count as auto\'s current model', async ($, on) => {
+  const rig = await ready($, on)
+  await $.command.run({ command: 'omni', args: 'max' })
+  await step($)
+  await $.command.run({ command: 'omni', args: 'auto' })
+  rig.label = 'trivial'
+  await $.prompt.submit(SUBMIT('rename a variable'))
+  expect(await parent($)).toContain('requested parent: sonnet/low (auto: trivial: first prompt)')
+})
+
+test('a redundant /omni auto keeps the plan', async ($, on) => {
+  const rig = await ready($, on)
+  rig.label = 'routine'
+  await $.prompt.submit(SUBMIT('add a unit test for parseOmni'))
+  await $.command.run({ command: 'omni', args: 'auto' })
+  expect(await parent($)).toContain('requested parent: sonnet/medium (auto: routine: first prompt)')
+})
+
+test('switching away from auto and back drops the old plan', async ($, on) => {
+  const rig = await ready($, on)
+  rig.label = 'routine'
+  await $.prompt.submit(SUBMIT('add a unit test for parseOmni'))
+  await $.command.run({ command: 'omni', args: 'economy' })
+  await step($)
+  await $.command.run({ command: 'omni', args: 'auto' })
+  expect(await status($)).toContain('auto classifier (last prompt): none yet')
+  rig.label = 'banana'
+  await $.prompt.submit(SUBMIT('anything'))
+  expect(await parent($)).toContain('requested parent: opus/medium (auto, not classified yet)')
 })
 
 test('a late upgrade to opus waits for a cheap re-cache and keeps the cache once the context is large', async ($, on) => {
@@ -145,7 +196,7 @@ test('auto upgrades the model while the context is small', async ($, on) => {
   expect(line).toContain('upgraded (context 12000 < 40000)')
 })
 
-test('a context reading that fails counts as an empty context, so the upgrade goes ahead', async ($, on) => {
+test('a context reading that fails counts as a full context, so the model stays with high effort', async ($, on) => {
   const rig = await ready($, on)
   rig.label = 'routine'
   await $.prompt.submit(SUBMIT('add a unit test for parseOmni'))
@@ -153,8 +204,18 @@ test('a context reading that fails counts as an empty context, so the upgrade go
   rig.tokens = 'FAIL'
   await $.prompt.submit(SUBMIT('redesign the auth token rotation across services'))
   const line = await parent($)
-  expect(line).toContain('opus/high')
-  expect(line).toContain('upgraded (context 0 < 40000)')
+  expect(line).toContain('sonnet/high')
+  expect(line).toContain('kept sonnet to preserve the cache')
+})
+
+test('a context reading with no token count counts as an empty context', async ($, on) => {
+  const rig = await ready($, on)
+  rig.tokens = 'NONE'
+  rig.label = 'routine'
+  await $.prompt.submit(SUBMIT('add a unit test for parseOmni'))
+  rig.label = 'critical'
+  await $.prompt.submit(SUBMIT('redesign the auth token rotation across services'))
+  expect(await parent($)).toContain('upgraded (context 0 < 40000)')
 })
 
 test('a model kept for the cache gets high effort, whatever the class asked for', async ($, on) => {

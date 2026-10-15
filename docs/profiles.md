@@ -116,6 +116,7 @@ Claude Code has an experimental advisor feature (official docs at https://code.c
 - A stronger model that the main model can consult. Set it with `/advisor opus`, the `advisorModel` setting, or `--advisor`.
 - Anthropic API only (subscriptions included). Claude decides when to consult it; on each call the advisor reads the whole conversation, billed at the advisor's own rates.
 - A Sonnet 5.5 parent accepts Fable, Opus 5 or later, and Sonnet 5.5 advisors. Subagents inherit the advisor. Fable as an advisor needs usage-credit consent.
+- An advisor must rank at or above the main model, so the pairing changes with the profile: under `balanced` or `quality` (Opus parent) `/advisor opus` is an Opus-on-Opus check, and under `max` (Fable parent) an Opus or Sonnet advisor is not applied at all; only a Fable advisor is. The advisor also needs feature-flag fetching: a session with a variable such as `DISABLE_TELEMETRY` set has no advisor, and `CLAUDE_CODE_DISABLE_ADVISOR_TOOL=1` disables it entirely. Toggling the advisor does not invalidate the main model's prompt cache (official advisor page, checked 2026-10-15).
 
 A combination you could try is `economy` plus `/advisor opus`: a Sonnet parent that consults Opus for consequential reasoning, a rough analogue of OmniCodex's "Terra control plane, Sol for consequential reasoning". Its effect on cost and quality is not measured, and because each consultation re-reads the conversation it may cost more than a single-model setup.
 

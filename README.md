@@ -112,11 +112,11 @@ Verified covers the main conversation only. For subagents, `/tasks` and the suba
 
 **When the mod is off.** With `--bare`, `--safe-mode`, `disableAllHooks`, `allowManagedModsOnly`, a remote rollout switch, or an engine older than 2.1.287, the mod does not load and `/omni` is absent. The Stage 1 routing skill, the seven workers and the `--settings` profile files still work, as advisory routing only.
 
-**Live-verified (2026-10-14, engine 2.1.295, headless runs; evidence in [local validation](docs/local-validation.md)):** the engine rejects aliases in `turn.step`; the mod sends full model ids; under `economy` the parent answered on `claude-sonnet-5-5` and an Explore subagent on `claude-haiku-5-5`; under `balanced` the parent answered on `claude-opus-5-5`.
+**Live-verified (2026-10-14, engine 2.1.295, headless runs; evidence in [local validation](docs/local-validation.md)):** the engine rejects aliases in `turn.step`; the mod sends full model ids; under `economy` the parent answered on `claude-sonnet-5-5` and an Explore subagent on `claude-haiku-5-5`; under `balanced` the parent answered on `claude-opus-5-5`. On 2026-10-15, `/omni status` ran in a new desktop Code-tab session and answered with the status text (profile `auto`, saved profile none, mod version 0.2.0-alpha.1); the status line showed `omni:auto`. Only `status` was exercised there.
 
 **Not yet live-verified:**
 
-- `/omni` in a desktop session (the mod's tests cover it; the headless attempt could not run it);
+- the `/omni` subcommands other than `status` in a desktop session (the mod's tests cover them; the headless attempt could not run the command);
 - the astra refusal in a live session, the clamps, the `quality`, `max` and `auto` profiles, Plan and general-purpose routing, and routing of other plugins' agents;
 - the `[1m]` form of a full id;
 - the latency of the `auto` classifier call.

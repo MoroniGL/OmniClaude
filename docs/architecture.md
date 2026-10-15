@@ -36,7 +36,7 @@ Configuration is a request. OmniClaude reports three levels separately:
 
 For subagents, the mod records only its own decision for the last spawn (`/omni status`, "last spawn": the agent type and the id it set, or `unchanged`). That is applied, not verified: `/tasks` names each subagent's model and effort setting and their transcripts record the served model, and the mod does not read those back.
 
-Live-verified on 2026-10-14 (engine 2.1.295, headless runs): the engine rejects aliases in `turn.step` and the mod sends full model ids; under `economy` the parent answered on `claude-sonnet-5-5` and an Explore subagent on `claude-haiku-5-5`; under `balanced` the parent answered on `claude-opus-5-5`. Not yet live-verified: routing of other plugins' agents, the latency of the `auto` classifier call (capped at 2.5 s), the `[1m]` form of a full id, and `/omni` in a desktop session.
+Live-verified on 2026-10-14 (engine 2.1.295, headless runs): the engine rejects aliases in `turn.step` and the mod sends full model ids; under `economy` the parent answered on `claude-sonnet-5-5` and an Explore subagent on `claude-haiku-5-5`; under `balanced` the parent answered on `claude-opus-5-5`. Not yet live-verified: routing of other plugins' agents, the latency of the `auto` classifier call (capped at 2.5 s), and the `[1m]` form of a full id. `/omni status` ran in a desktop Code-tab session on 2026-10-15 (status line `omni:auto`, mod version 0.2.0-alpha.1); the other subcommands were not exercised there.
 
 ## Delivery
 - Stage 1: agents, skill, CLI profile files, eval suite. No hooks.

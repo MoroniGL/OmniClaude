@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Docs: `/omni status` confirmed in a new desktop Code-tab session on 2026-10-15 (status line `omni:auto`); the other `/omni` subcommands remain test-covered only in a desktop session.
+
 ## 0.2.0-alpha.1 — Stage 2 (enforcing mod), experimental
 
 - A mod (hooks module, `plugins/omniclaude/hooks/`) that applies the routing profile in the session instead of only recommending it. Needs Claude Code engine 2.1.287 or later; where the mod is off, the Stage 1 skill, agents and profile files still work (advisory only).

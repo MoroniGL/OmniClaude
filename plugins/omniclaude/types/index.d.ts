@@ -19,8 +19,8 @@ declare module 'claude-code' {
       lastStep: LastStep | null
       profileOverride: Profile | null
       plan: Plan | null
-      astraConsent: boolean
-      astraConsentFromMax: boolean
+      fableConsent: boolean
+      fableConsentFromMax: boolean
       applied: Applied | null
       verified: Verified | null
       lastClass: LastClass | null

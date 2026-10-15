@@ -25,13 +25,13 @@ Distinguish requested configuration, local execution records, and provider respo
 
 | Worker | Model alias | Effort | Notes |
 |---|---|---|---|
-| luna-researcher | haiku | medium | read-only; Haiku 5.5 stops early at low effort |
-| terra-explorer | sonnet | low | read-only code mapping |
-| terra-implementer | sonnet | medium | bounded implementation |
-| sol-planner | opus | medium | no file edits |
-| sol-reviewer | opus | medium | no file edits; request high per call for high-stakes reviews |
-| sol-debugger | opus | high | difficult debugging |
-| astra-expert | fable | low | exceptional only; ask the user before dispatching, even after a sol failure; re-run at high on failure; may bill usage credits |
+| haiku-researcher | haiku | medium | read-only; Haiku 5.5 stops early at low effort |
+| sonnet-explorer | sonnet | low | read-only code mapping |
+| sonnet-implementer | sonnet | medium | bounded implementation |
+| opus-planner | opus | medium | no file edits |
+| opus-reviewer | opus | medium | no file edits; request high per call for high-stakes reviews |
+| opus-debugger | opus | high | difficult debugging |
+| fable-expert | fable | low | exceptional only; ask the user before dispatching, even after an opus failure; re-run at high on failure; may bill usage credits |
 
 These are the shipped targets. Do not rewrite them because a newer model exists. Compare representative tasks with `claude plugin eval` first.
 
@@ -51,7 +51,7 @@ A profile sets the parent model and effort. Worker tiers stay the same in every 
 
 ## Escalation ladder
 
-    same worker, higher effort  ->  next tier at low effort  ->  astra-expert (last, with consent)
+    same worker, higher effort  ->  next tier at low effort  ->  fable-expert (last, with consent)
 
 Anthropic's cost guidance reports that, for checkable work, running at low effort and re-running failures at high kept the pass rate at roughly half the cost, and that moving up a model tier should start at low effort. These figures are Anthropic's, not OmniClaude measurements, and were not independently verified.
 

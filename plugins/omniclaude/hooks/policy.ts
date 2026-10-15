@@ -22,13 +22,13 @@ export const PROFILES: Record<FixedProfile, { parent: { model: Tier; effort: Eff
 }
 
 export const WORKER_TIERS: Record<string, Tier> = {
-  'omniclaude:luna-researcher': 'haiku',
-  'omniclaude:terra-explorer': 'sonnet',
-  'omniclaude:terra-implementer': 'sonnet',
-  'omniclaude:sol-planner': 'opus',
-  'omniclaude:sol-reviewer': 'opus',
-  'omniclaude:sol-debugger': 'opus',
-  'omniclaude:astra-expert': 'fable',
+  'omniclaude:haiku-researcher': 'haiku',
+  'omniclaude:sonnet-explorer': 'sonnet',
+  'omniclaude:sonnet-implementer': 'sonnet',
+  'omniclaude:opus-planner': 'opus',
+  'omniclaude:opus-reviewer': 'opus',
+  'omniclaude:opus-debugger': 'opus',
+  'omniclaude:fable-expert': 'fable',
 }
 
 export const AUTO_UPGRADE_CONTEXT_LIMIT = 40_000
@@ -74,11 +74,11 @@ export function mainLoopModel(engineModel: string, target: Tier): string {
   return modelIdFor(target, engineModel.trim().toLowerCase().endsWith('[1m]'))
 }
 
-export const ASTRA = 'omniclaude:astra-expert'
+export const FABLE = 'omniclaude:fable-expert'
 
-/** astra-expert under OmniClaude's name or any other plugin name a marketplace gave it. */
+/** fable-expert under OmniClaude's name or any other plugin name a marketplace gave it. */
 export function isAstraType(subagentType: string): boolean {
-  return subagentType === ASTRA || subagentType.endsWith(':astra-expert')
+  return subagentType === FABLE || subagentType.endsWith(':fable-expert')
 }
 
 /** Engine built-ins the profile routes; any other engine agent (claude-code-guide, statusline-setup, ...) keeps its own model. */

@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+## 0.3.0-alpha.1 — worker tiers renamed to the Claude model families
+
+- The four tiers inherited from OmniCodex are now named after the Claude model families they run on: `luna` → `haiku`, `terra` → `sonnet`, `sol` → `opus`, `astra` → `fable`. Agents: `omniclaude:haiku-researcher`, `sonnet-explorer`, `sonnet-implementer`, `opus-planner`, `opus-reviewer`, `opus-debugger`, `fable-expert`. Anyone who typed the old names must switch; the files, the mod, the tests, the eval graders (`no-fable`) and the docs follow. Recorded results and dated specs keep the names in force when they were written.
+- `/omni astra allow|deny` is now `/omni fable allow|deny`; the refusal reads `fable-expert needs your agreement: run /omni fable allow`; `/omni status` shows `fable consent`.
+- Why: Claude Code already speaks this vocabulary (`/model`, the `model:` field of an agent), the cost is readable in the worker's name, and the name cannot drift from the model because workers keep their tier in every profile.
 - Docs: `/omni status` confirmed in a new desktop Code-tab session on 2026-10-15 (status line `omni:auto`); the other `/omni` subcommands remain test-covered only in a desktop session.
 
 ## 0.2.0-alpha.1 — Stage 2 (enforcing mod), experimental

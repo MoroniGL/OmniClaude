@@ -2,6 +2,8 @@
 
 Machine: Windows 11, Claude desktop app engine 2.1.295 (no `claude` on PATH). Date: 2026-10-13.
 
+Names: on 2026-10-15 the workers were renamed after the Claude model families (`luna` → `haiku`, `terra` → `sonnet`, `sol` → `opus`, `astra` → `fable`; `/omni astra` → `/omni fable`; grader `no-astra` → `no-fable`). The records below keep the names in force when they were taken.
+
 Repo state at install time: branch `stage1-core`, HEAD a9a048b.
 
 ## Offline gate

@@ -18,8 +18,8 @@ class FrontmatterTests(unittest.TestCase):
         return Path(handle.name)
 
     def test_parses_scalar_keys_and_body(self) -> None:
-        meta, body = parse(self.write("---\nname: luna\ndescription: a: b\n---\nBody line\n"))
-        self.assertEqual(meta, {"name": "luna", "description": "a: b"})
+        meta, body = parse(self.write("---\nname: haiku\ndescription: a: b\n---\nBody line\n"))
+        self.assertEqual(meta, {"name": "haiku", "description": "a: b"})
         self.assertEqual(body, "Body line\n")
 
     def test_accepts_crlf(self) -> None:

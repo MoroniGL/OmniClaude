@@ -1,6 +1,6 @@
 # Profiles
 
-A profile sets what the OmniClaude mod applies in a session: the **parent's** model and effort, the tier of the subagents the mod routes, and whether `astra-expert` needs your consent. OmniClaude's own workers keep their tiers in every profile. Where the mod is off, profiles are only the `--settings` files below.
+A profile sets what the OmniClaude mod applies in a session: the **parent's** model and effort, the tier of the subagents the mod routes, and whether `fable-expert` needs your consent. OmniClaude's own workers keep their tiers in every profile. Where the mod is off, profiles are only the `--settings` files below.
 
 Choose a profile with `/omni <profile>` (this session), `/omni save <profile>` (the plugin's own store, not `settings.json`), the `OMNICLAUDE_PROFILE` environment variable, or the `/config` picker "Routing profile". The profile in force is, in order:
 
@@ -18,36 +18,36 @@ Notes:
 
 ## Enforced by the mod
 
-| Profile | Parent (every main-loop request) | Explore | Plan, general-purpose and other routed subagents | astra-expert |
+| Profile | Parent (every main-loop request) | Explore | Plan, general-purpose and other routed subagents | fable-expert |
 |---|---|---|---|---|
-| `omni:economy` | Sonnet / medium | Haiku | Sonnet | denied until `/omni astra allow` |
-| `omni:balanced` | Opus / medium | Sonnet | Sonnet | denied until `/omni astra allow` |
-| `omni:quality` | Opus / high | Sonnet | Opus | denied until `/omni astra allow` |
+| `omni:economy` | Sonnet / medium | Haiku | Sonnet | denied until `/omni fable allow` |
+| `omni:balanced` | Opus / medium | Sonnet | Sonnet | denied until `/omni fable allow` |
+| `omni:quality` | Opus / high | Sonnet | Opus | denied until `/omni fable allow` |
 | `omni:max` | Fable / high | Opus | Opus | allowed; `max` sets the consent flag |
-| `omni:auto` (default) | chosen per prompt (below); Opus / medium until the first prompt is classified | as `balanced` | as `balanced` | denied until `/omni astra allow` |
+| `omni:auto` (default) | chosen per prompt (below); Opus / medium until the first prompt is classified | as `balanced` | as `balanced` | denied until `/omni fable allow` |
 
 Rules:
 
 - **Model ids.** The engine rejects aliases in `turn.step`; the mod sends full model ids (live-verified 2026-10-14): `claude-haiku-5-5`, `claude-sonnet-5-5`, `claude-opus-5-5`, `claude-fable-5-1`.
 - **Main loop.** A step whose model is already on the profile's tier keeps the engine's own id and gets the profile's effort; a step on another tier is rewritten to the tier's id. When the engine's model carries a `[1m]` suffix, a rewritten Opus or Sonnet id keeps it. Fable and Haiku have no 1M form, so `max` sends plain `claude-fable-5-1`. (The `[1m]` form of a full id has not been live-tested.)
-- **OmniClaude workers.** A worker's own frontmatter tier is applied as it is (luna Haiku, terra Sonnet, sol Opus, astra Fable). If a caller passes a `model` above that tier, or one the mod cannot place, the mod replaces it with the tier's id, except under `max`, where the request stands. A `model` at or below the tier stands.
+- **OmniClaude workers.** A worker's own frontmatter tier is applied as it is (haiku, sonnet, opus, fable). If a caller passes a `model` above that tier, or one the mod cannot place, the mod replaces it with the tier's id, except under `max`, where the request stands. A `model` at or below the tier stands.
 - **Other agents.** Explore gets the profile's explore tier. Plan and general-purpose get the profile's general tier (Plan follows the general tier), and so does any other routed agent: other plugins' agents are routed by profile; agents of your own are routed only if the engine reports them as non-engine-provided (not live-verified). With no request, the profile's tier applies. With an explicit `model` request, a request above the profile's tier (or one the mod cannot place) is replaced by the tier's id and one at or below it stands; under `max` the request stands. The mod cannot read a custom agent's own frontmatter model, so a routed custom agent gets the profile's tier whatever its frontmatter says.
 - **Engine built-ins.** Among the engine's own agents only Explore, Plan and general-purpose are routed. Others (claude-code-guide, statusline-setup and the like) keep their own model.
-- **Not routed.** Forks, teammates and workflow agents are not rewritten. The consent gate below still applies to a teammate or workflow agent of type `astra-expert`.
+- **Not routed.** Forks, teammates and workflow agents are not rewritten. The consent gate below still applies to a teammate or workflow agent of type `fable-expert`.
 - **Effort** on subagent loops is not rewritten; the worker's own effort applies.
-- **astra-expert consent.** `omniclaude:astra-expert` (under any plugin name) is denied with `astra-expert needs your agreement: run /omni astra allow` unless the consent flag is true. The flag is set by:
-  - `/omni astra allow`;
+- **fable-expert consent.** `omniclaude:fable-expert` (under any plugin name) is denied with `fable-expert needs your agreement: run /omni fable allow` unless the consent flag is true. The flag is set by:
+  - `/omni fable allow`;
   - `/omni max`;
   - `/omni save max`, when `max` becomes the effective profile;
   - `/omni reset` back to a saved `max`;
   - session start, when the resolved profile is `max` (also through `OMNICLAUDE_PROFILE=max`).
 
-  Consent that `max` sets is cleared when you leave `max` via `/omni` (a `/config` change or another session's save does not clear it); consent you gave with `/omni astra allow` survives profile changes. `/omni astra deny` clears the flag and keeps astra-expert denied even under `max`. Fable may bill usage credits on some plans.
+  Consent that `max` sets is cleared when you leave `max` via `/omni` (a `/config` change or another session's save does not clear it); consent you gave with `/omni fable allow` survives profile changes. `/omni fable deny` clears the flag and keeps fable-expert denied even under `max`. Fable may bill usage credits on some plans.
 - **Records and failures.** The mod records the last spawn it decided (`/omni status`, "last spawn": the agent type and the id it set, or `unchanged`). The record never denies a spawn. If the spawn guard itself fails before it passes the spawn on, the spawn is refused. If `turn.step` fails, the step runs unchanged and the badge reads `not applied (hook error)`.
 
 Every row says what the mod **applies**. What the API reports back is shown separately, as "verified" in `/omni status`.
 
-Live-verified on 2026-10-14 (engine 2.1.295, headless runs): the alias rejection and the full ids above; under `economy` the parent answered on `claude-sonnet-5-5` and an Explore subagent on `claude-haiku-5-5`; under `balanced` the parent answered on `claude-opus-5-5`. See [local validation](local-validation.md). Not yet live-verified: the `quality`, `max` and `auto` profiles, Plan and general-purpose routing, routing of other plugins' agents, the clamps, the astra refusal in a live session, and `/omni` in a desktop session (the mod's tests cover them).
+Live-verified on 2026-10-14 (engine 2.1.295, headless runs): the alias rejection and the full ids above; under `economy` the parent answered on `claude-sonnet-5-5` and an Explore subagent on `claude-haiku-5-5`; under `balanced` the parent answered on `claude-opus-5-5`. See [local validation](local-validation.md). Not yet live-verified: the `quality`, `max` and `auto` profiles, Plan and general-purpose routing, routing of other plugins' agents, the clamps, the fable refusal in a live session, and `/omni` in a desktop session (the mod's tests cover them).
 
 ## `omni:auto`
 

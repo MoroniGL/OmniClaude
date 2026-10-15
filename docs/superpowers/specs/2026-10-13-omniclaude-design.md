@@ -262,3 +262,7 @@ The stage 2 outline below gets re-planned with stage 1 evidence:
 - Claude Code ships often. Minimum versions: 2.1.293 for the Haiku 5.5 alias, 2.1.271
   for `omitClaudeMd`, and 2.1.289 for combined validation.
 - The coexisting claude-flow router in `C:\CC` can inject competing routing advice.
+
+## Amendment (2026-10-15): tier names
+
+The tier vocabulary inherited from OmniCodex (luna, terra, sol, astra) is replaced by the Claude model families the tiers run on: haiku, sonnet, opus, fable. The user chose this on 2026-10-15 over keeping the OmniCodex names or adopting functional names; the official sub-agents documentation only requires a unique `name` (such as `code-reviewer`) and reserves nothing, and the mod already keyed its tiers by model family internally. Shipped as 0.3.0-alpha.1.

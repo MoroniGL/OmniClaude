@@ -12,14 +12,14 @@ import type { EnvProfile, OmniCommand } from './omni'
 const LAST_STEP = { plugin: 'omniclaude', key: 'lastStep' } as const
 const PROFILE_OVERRIDE = { plugin: 'omniclaude', key: 'profileOverride' } as const
 const PLAN = { plugin: 'omniclaude', key: 'plan' } as const
-const ASTRA_CONSENT = { plugin: 'omniclaude', key: 'astraConsent' } as const
-const ASTRA_CONSENT_FROM_MAX = { plugin: 'omniclaude', key: 'astraConsentFromMax' } as const
+const FABLE_CONSENT = { plugin: 'omniclaude', key: 'fableConsent' } as const
+const FABLE_CONSENT_FROM_MAX = { plugin: 'omniclaude', key: 'fableConsentFromMax' } as const
 const APPLIED = { plugin: 'omniclaude', key: 'applied' } as const
 const VERIFIED = { plugin: 'omniclaude', key: 'verified' } as const
 const LAST_CLASS = { plugin: 'omniclaude', key: 'lastClass' } as const
 const LAST_SPAWN = { plugin: 'omniclaude', key: 'lastSpawn' } as const
 
-const ASTRA_DENY = 'astra-expert needs your agreement: run /omni astra allow'
+const FABLE_DENY = 'fable-expert needs your agreement: run /omni fable allow'
 
 /** OMNICLAUDE_PROFILE, else EVAL_OMNICLAUDE_PROFILE (what a `plugin eval` child inherits); a value that is no profile, or a read that fails, counts as unset. */
 async function envProfile($: EngineInterface): Promise<EnvProfile | undefined> {
@@ -94,21 +94,21 @@ async function forgetPlanIfSwitched($: EngineInterface, before: Profile, optionP
   await $.state.set(LAST_CLASS, null)
 }
 
-/** Consent that max gave goes away when the effective profile leaves max; an explicit `/omni astra allow` stays. */
+/** Consent that max gave goes away when the effective profile leaves max; an explicit `/omni fable allow` stays. */
 async function dropMaxConsent($: EngineInterface): Promise<void> {
-  const { value: fromMax } = await $.state.get(ASTRA_CONSENT_FROM_MAX)
+  const { value: fromMax } = await $.state.get(FABLE_CONSENT_FROM_MAX)
   if (fromMax !== true) return
-  await $.state.set(ASTRA_CONSENT, false)
-  await $.state.set(ASTRA_CONSENT_FROM_MAX, false)
+  await $.state.set(FABLE_CONSENT, false)
+  await $.state.set(FABLE_CONSENT_FROM_MAX, false)
 }
 
-/** Max grants the astra consent, tagged as max's; an explicit allow already on stays explicit. Returns the warning to show. */
+/** Max grants the fable consent, tagged as max's; an explicit allow already on stays explicit. Returns the warning to show. */
 async function grantMaxConsent($: EngineInterface): Promise<string> {
-  const { value: consent } = await $.state.get(ASTRA_CONSENT)
-  const { value: fromMax } = await $.state.get(ASTRA_CONSENT_FROM_MAX)
+  const { value: consent } = await $.state.get(FABLE_CONSENT)
+  const { value: fromMax } = await $.state.get(FABLE_CONSENT_FROM_MAX)
   if (consent === true && fromMax !== true) return MAX_WARNING_KEPT
-  await $.state.set(ASTRA_CONSENT, true)
-  await $.state.set(ASTRA_CONSENT_FROM_MAX, true)
+  await $.state.set(FABLE_CONSENT, true)
+  await $.state.set(FABLE_CONSENT_FROM_MAX, true)
   return MAX_WARNING
 }
 
@@ -131,8 +131,8 @@ async function statusText($: EngineInterface, optionProfile: unknown): Promise<s
   const { value: verified } = await $.state.get(VERIFIED)
   const { value: lastClass } = await $.state.get(LAST_CLASS)
   const { value: lastSpawn } = await $.state.get(LAST_SPAWN)
-  const { value: consent } = await $.state.get(ASTRA_CONSENT)
-  const { value: fromMax } = await $.state.get(ASTRA_CONSENT_FROM_MAX)
+  const { value: consent } = await $.state.get(FABLE_CONSENT)
+  const { value: fromMax } = await $.state.get(FABLE_CONSENT_FROM_MAX)
   const effective = await resolveProfile($, optionProfile)
   const env = await envProfile($)
   return formatStatus({
@@ -158,9 +158,9 @@ export async function runOmni($: EngineInterface, cmd: OmniCommand, ctx: OmniCon
     case 'reset':
       await $.state.set(PROFILE_OVERRIDE, null)
       return afterSwitch($, ctx, false, '')
-    case 'astra':
-      await $.state.set(ASTRA_CONSENT, cmd.allow)
-      await $.state.set(ASTRA_CONSENT_FROM_MAX, false)
+    case 'fable':
+      await $.state.set(FABLE_CONSENT, cmd.allow)
+      await $.state.set(FABLE_CONSENT_FROM_MAX, false)
       return statusText($, ctx.optionProfile)
     case 'doctor':
       return doctorText(ctx.version)
@@ -176,7 +176,7 @@ export const register: Register = (on, options) => {
     await $.command.register({
       name: 'omni',
       description: 'OmniClaude: show or change the routing profile',
-      argumentHint: 'status | economy | balanced | quality | max | auto | save <profile> | reset | astra allow|deny | doctor',
+      argumentHint: 'status | economy | balanced | quality | max | auto | save <profile> | reset | fable allow|deny | doctor',
     })
     const profile = await resolveProfile($, optionProfile)
     // A session that starts on max has max's consent, as /omni max gives it; the badge of any other profile ignores consent.
@@ -189,7 +189,7 @@ export const register: Register = (on, options) => {
     const version = (await $.session.version()).version
     const before = await resolveProfile($, optionProfile)
     const text = await runOmni($, parseOmni(e.args), { optionProfile, version, before })
-    const { value: consent } = await $.state.get(ASTRA_CONSENT)
+    const { value: consent } = await $.state.get(FABLE_CONSENT)
     $.ui.status(badge(await resolveProfile($, optionProfile), consent === true))
     return { text }
   })
@@ -252,8 +252,8 @@ export const register: Register = (on, options) => {
   on('agent.spawn', async ($, e, next) => {
     // The consent gate comes first and reads only the flag (max sets it): a teammate or workflow agent of this type must not slip past it (a fork's type is `fork`).
     if (isAstraType(e.subagentType)) {
-      const { value: consent } = await $.state.get(ASTRA_CONSENT)
-      if (consent !== true) return { deny: ASTRA_DENY }
+      const { value: consent } = await $.state.get(FABLE_CONSENT)
+      if (consent !== true) return { deny: FABLE_DENY }
     }
     let model: string | undefined
     if (!e.fork && !e.isTeammate && !e.workflow && routesSpawn(e.subagentType, e.provider?.plugin)) {

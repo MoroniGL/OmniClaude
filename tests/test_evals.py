@@ -35,9 +35,9 @@ class EvalTests(unittest.TestCase):
                 self.assertGreaterEqual(len(graders), 2)
                 for grader in graders:
                     self.assertIn(parse(grader)[0]["type"], GRADER_TYPES)
-                no_astra = EVALS / case / "graders" / "no-astra.md"
-                self.assertTrue(no_astra.is_file(), "every case must forbid astra-expert")
-                self.assertEqual(parse(no_astra)[0]["type"], "tool_used")
+                no_fable = EVALS / case / "graders" / "no-fable.md"
+                self.assertTrue(no_fable.is_file(), "every case must forbid fable-expert")
+                self.assertEqual(parse(no_fable)[0]["type"], "tool_used")
                 # Indicators (min: 0, always pass): their counts in the report show whether delegation and the skill happened.
                 for indicator in ("agent-used.md", "skill-fired.md"):
                     path = EVALS / case / "graders" / indicator

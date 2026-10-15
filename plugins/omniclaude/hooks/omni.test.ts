@@ -1,7 +1,7 @@
 import { test, expect, mock } from 'claude-code/testing'
 import { parseOmni } from './omni'
 
-const ASTRA_DENY = 'astra-expert needs your agreement: run /omni astra allow'
+const FABLE_DENY = 'fable-expert needs your agreement: run /omni fable allow'
 
 // The test's `$` has no `state` noun: state is set through /omni commands and read back through their text.
 async function omni($: any, args: string): Promise<string> {
@@ -31,13 +31,13 @@ test('parseOmni understands every form', async () => {
   expect(parseOmni('  Quality ')).toEqual({ kind: 'set', profile: 'quality' })
   expect(parseOmni('save max')).toEqual({ kind: 'save', profile: 'max' })
   expect(parseOmni('reset')).toEqual({ kind: 'reset' })
-  expect(parseOmni('astra allow')).toEqual({ kind: 'astra', allow: true })
-  expect(parseOmni('astra deny')).toEqual({ kind: 'astra', allow: false })
+  expect(parseOmni('fable allow')).toEqual({ kind: 'fable', allow: true })
+  expect(parseOmni('fable deny')).toEqual({ kind: 'fable', allow: false })
   expect(parseOmni('doctor')).toEqual({ kind: 'doctor' })
   expect(parseOmni('bogus')).toEqual({ kind: 'help' })
   expect(parseOmni('save bogus')).toEqual({ kind: 'help' })
   expect(parseOmni('economy extra')).toEqual({ kind: 'help' })
-  expect(parseOmni('astra')).toEqual({ kind: 'help' })
+  expect(parseOmni('fable')).toEqual({ kind: 'help' })
 })
 
 test('/omni status reports saved, override, parent, applied, verified and consent', async ($, on) => {
@@ -49,8 +49,8 @@ test('/omni status reports saved, override, parent, applied, verified and consen
   expect(text).toContain('requested parent: opus/high')
   expect(text).toContain('applied (last step): none yet')
   expect(text).toContain('verified (last turn, API-reported): none yet')
-  expect(text).toContain('astra consent: no')
-  expect(text).toContain('mod version: 0.2.0-alpha.1')
+  expect(text).toContain('fable consent: no')
+  expect(text).toContain('mod version: 0.3.0-alpha.1')
 })
 
 test('/omni with no arguments is /omni status', async ($, on) => {
@@ -101,10 +101,10 @@ test('/omni save persists the profile without touching the session override', as
   expect(later).toContain('OmniClaude quality')
 })
 
-test('/omni astra allow and deny set the consent', async ($, on) => {
+test('/omni fable allow and deny set the consent', async ($, on) => {
   await ready($, on, {})
-  expect(await omni($, 'astra allow')).toContain('astra consent: yes')
-  expect(await omni($, 'astra deny')).toContain('astra consent: no')
+  expect(await omni($, 'fable allow')).toContain('fable consent: yes')
+  expect(await omni($, 'fable deny')).toContain('fable consent: no')
 })
 
 test('/omni max sets consent and warns that Fable may bill usage credits', async ($, on) => {
@@ -113,8 +113,8 @@ test('/omni max sets consent and warns that Fable may bill usage credits', async
   expect(max).toContain('Fable')
   expect(max).toContain('usage credits')
   expect(max).toContain('requested parent: fable/high')
-  expect(max).toContain('astra consent: yes')
-  expect(await omni($, 'status')).toContain('astra consent: yes')
+  expect(max).toContain('fable consent: yes')
+  expect(await omni($, 'status')).toContain('fable consent: yes')
 })
 
 test('consent set by /omni max is cleared when you leave max', async ($, on) => {
@@ -122,59 +122,59 @@ test('consent set by /omni max is cleared when you leave max', async ($, on) => 
   on('agent.spawn', async (_$, e) => { spawned.push(e); return { model: e.model ?? 'inherit', agentId: 'a1' } })
   await ready($, on, {})
   expect(await omni($, 'max')).toContain('This consent is cleared when you leave max.')
-  expect(await omni($, 'economy')).toContain('astra consent: no')
-  expect(await omni($, 'status')).toContain('astra consent: no')
-  // the spawn gate follows: a plain astra-expert spawn is denied again outside max
-  const denied: any = await $.agent.spawn({ prompt: 'p', description: 'd', subagentType: 'omniclaude:astra-expert' })
-  expect(denied.deny).toBe(ASTRA_DENY)
+  expect(await omni($, 'economy')).toContain('fable consent: no')
+  expect(await omni($, 'status')).toContain('fable consent: no')
+  // the spawn gate follows: a plain fable-expert spawn is denied again outside max
+  const denied: any = await $.agent.spawn({ prompt: 'p', description: 'd', subagentType: 'omniclaude:fable-expert' })
+  expect(denied.deny).toBe(FABLE_DENY)
   expect(spawned.length).toBe(0)
 })
 
 test('/omni reset also clears consent that /omni max set', async ($, on) => {
   await ready($, on, {})
-  expect(await omni($, 'max')).toContain('astra consent: yes')
-  expect(await omni($, 'reset')).toContain('astra consent: no')
+  expect(await omni($, 'max')).toContain('fable consent: yes')
+  expect(await omni($, 'reset')).toContain('fable consent: no')
 })
 
-test('explicit /omni astra allow survives leaving max', async ($, on) => {
+test('explicit /omni fable allow survives leaving max', async ($, on) => {
   await ready($, on, {})
-  await omni($, 'astra allow')
+  await omni($, 'fable allow')
   await omni($, 'max')
-  expect(await omni($, 'economy')).toContain('astra consent: yes')
+  expect(await omni($, 'economy')).toContain('fable consent: yes')
   // /omni max did not take over the explicit allow, so reset keeps it too
   await omni($, 'max')
-  expect(await omni($, 'reset')).toContain('astra consent: yes')
+  expect(await omni($, 'reset')).toContain('fable consent: yes')
 })
 
-test('an /omni astra allow given while on max makes the consent explicit', async ($, on) => {
+test('an /omni fable allow given while on max makes the consent explicit', async ($, on) => {
   await ready($, on, {})
   await omni($, 'max')
-  await omni($, 'astra allow')
-  expect(await omni($, 'quality')).toContain('astra consent: yes')
+  await omni($, 'fable allow')
+  expect(await omni($, 'quality')).toContain('fable consent: yes')
 })
 
-test('under max the status says the consent was set by max, and /omni astra deny takes it away', async ($, on) => {
+test('under max the status says the consent was set by max, and /omni fable deny takes it away', async ($, on) => {
   const spawned: any[] = []
   on('agent.spawn', async (_$, e) => { spawned.push(e); return { model: e.model ?? 'inherit', agentId: 'a1' } })
   const statuses = await ready($, on, {})
-  expect(await omni($, 'max')).toContain('astra consent: yes (set by max)')
-  expect(await omni($, 'astra deny')).toContain('astra consent: no')
-  // the badge no longer says astra-expert is allowed
-  expect(statuses[statuses.length - 1]).not.toContain('astra-expert allowed')
-  expect(await omni($, 'status')).toContain('astra consent: no')
+  expect(await omni($, 'max')).toContain('fable consent: yes (set by max)')
+  expect(await omni($, 'fable deny')).toContain('fable consent: no')
+  // the badge no longer says fable-expert is allowed
+  expect(statuses[statuses.length - 1]).not.toContain('fable-expert allowed')
+  expect(await omni($, 'status')).toContain('fable consent: no')
   // the gate reads only the flag: denied even under max
-  const denied: any = await $.agent.spawn({ prompt: 'p', description: 'd', subagentType: 'omniclaude:astra-expert' })
-  expect(denied.deny).toBe(ASTRA_DENY)
+  const denied: any = await $.agent.spawn({ prompt: 'p', description: 'd', subagentType: 'omniclaude:fable-expert' })
+  expect(denied.deny).toBe(FABLE_DENY)
   expect(spawned.length).toBe(0)
-  expect(await omni($, 'astra allow')).toContain('astra consent: yes')
+  expect(await omni($, 'fable allow')).toContain('fable consent: yes')
 })
 
 test('a session that starts on max has the consent set by max', async ($, on) => {
   const spawned: any[] = []
   on('agent.spawn', async (_$, e) => { spawned.push(e); return { model: e.model ?? 'inherit', agentId: 'a1' } })
   await ready($, on, { profile: 'max' })
-  expect(await omni($, 'status')).toContain('astra consent: yes (set by max)')
-  const allowed: any = await $.agent.spawn({ prompt: 'p', description: 'd', subagentType: 'omniclaude:astra-expert' })
+  expect(await omni($, 'status')).toContain('fable consent: yes (set by max)')
+  const allowed: any = await $.agent.spawn({ prompt: 'p', description: 'd', subagentType: 'omniclaude:fable-expert' })
   expect(allowed.deny).toBeUndefined()
   expect(spawned.length).toBe(1)
 })
@@ -185,10 +185,10 @@ test('/omni save <p> with no session override applies now', async ($, on) => {
   expect(saved).toContain('OmniClaude max')
   expect(saved).toContain('saved max: applies now (no session override) and in future sessions.')
   expect(saved).toContain('This consent is cleared when you leave max.')
-  expect(saved).toContain('astra consent: yes (set by max)')
-  expect(statuses[statuses.length - 1]).toBe('omni:max · Fable parent; astra-expert allowed — may bill usage credits')
+  expect(saved).toContain('fable consent: yes (set by max)')
+  expect(statuses[statuses.length - 1]).toBe('omni:max · Fable parent; fable-expert allowed — may bill usage credits')
   // leaving max by saving another profile takes the consent max set back
-  expect(await omni($, 'save quality')).toContain('astra consent: no')
+  expect(await omni($, 'save quality')).toContain('fable consent: no')
 })
 
 test('/omni save <p> under a session override keeps the override', async ($, on) => {
@@ -202,11 +202,11 @@ test('/omni save <p> under a session override keeps the override', async ($, on)
 
 test('/omni max after an explicit allow says the allow stays in force', async ($, on) => {
   await ready($, on, {})
-  await omni($, 'astra allow')
+  await omni($, 'fable allow')
   const max = await omni($, 'max')
-  expect(max).toContain(' Fable may bill usage credits on some plans; your earlier /omni astra allow stays in force.')
+  expect(max).toContain(' Fable may bill usage credits on some plans; your earlier /omni fable allow stays in force.')
   expect(max).not.toContain('This consent is cleared when you leave max.')
-  expect(max).toContain('astra consent: yes')
+  expect(max).toContain('fable consent: yes')
   expect(max).not.toContain('set by max')
 })
 
@@ -276,34 +276,34 @@ test('the status line stays short for the other profiles', async ($, on) => {
   expect(statuses[statuses.length - 1]).toBe('omni:quality')
 })
 
-test('astra-expert as a teammate is not denied under the max profile', async ($, on) => {
+test('fable-expert as a teammate is not denied under the max profile', async ($, on) => {
   const spawned: any[] = []
   on('agent.spawn', async (_$, e) => { spawned.push(e); return { model: e.model ?? 'inherit', agentId: 'a1' } })
   await ready($, on, { profile: 'max' })
   const result: any = await $.agent.spawn({
-    prompt: 'do the thing', description: 'test', subagentType: 'omniclaude:astra-expert', isTeammate: true,
+    prompt: 'do the thing', description: 'test', subagentType: 'omniclaude:fable-expert', isTeammate: true,
   } as any)
   expect(result.deny).toBeUndefined()
   expect(spawned.length).toBe(1)
-  expect(spawned[0].subagentType).toBe('omniclaude:astra-expert')
+  expect(spawned[0].subagentType).toBe('omniclaude:fable-expert')
 })
 
-test('/omni astra allow lets a plain astra-expert spawn through under quality', async ($, on) => {
+test('/omni fable allow lets a plain fable-expert spawn through under quality', async ($, on) => {
   const spawned: any[] = []
   on('agent.spawn', async (_$, e) => { spawned.push(e); return { model: e.model ?? 'inherit', agentId: 'a1' } })
   await ready($, on, { profile: 'quality' })
-  const spawn = { prompt: 'do the thing', description: 'test', subagentType: 'omniclaude:astra-expert' }
+  const spawn = { prompt: 'do the thing', description: 'test', subagentType: 'omniclaude:fable-expert' }
   const before: any = await $.agent.spawn(spawn)
-  expect(before.deny).toBe(ASTRA_DENY)
+  expect(before.deny).toBe(FABLE_DENY)
   expect(spawned.length).toBe(0)
-  await omni($, 'astra allow')
+  await omni($, 'fable allow')
   const after: any = await $.agent.spawn(spawn)
   expect(after.deny).toBeUndefined()
   expect(spawned.length).toBe(1)
   // and deny takes it away again
-  await omni($, 'astra deny')
+  await omni($, 'fable deny')
   const again: any = await $.agent.spawn(spawn)
-  expect(again.deny).toBe(ASTRA_DENY)
+  expect(again.deny).toBe(FABLE_DENY)
   expect(spawned.length).toBe(1)
 })
 
@@ -323,10 +323,10 @@ test('an unknown /omni argument prints help and changes nothing', async ($, on) 
   await ready($, on, { profile: 'quality' })
   const help = await omni($, 'bogus')
   expect(help).toContain('/omni status | economy | balanced | quality | max | auto')
-  expect(help).toContain('/omni save <profile> | reset | astra allow|deny | doctor')
+  expect(help).toContain('/omni save <profile> | reset | fable allow|deny | doctor')
   const text = await omni($, 'status')
   expect(text).toContain('session override: none')
-  expect(text).toContain('astra consent: no')
+  expect(text).toContain('fable consent: no')
 })
 
 test('a failed read of OMNICLAUDE_PROFILE does not hide EVAL_OMNICLAUDE_PROFILE', async ($, on) => {

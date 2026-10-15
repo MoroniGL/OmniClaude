@@ -42,10 +42,10 @@ test('TIER_IDS holds the four full ids and modelIdFor adds [1m] only on opus and
 })
 
 test('worker tiers are the shipped frontmatter tiers', async () => {
-  expect(WORKER_TIERS['omniclaude:luna-researcher']).toBe('haiku')
-  expect(WORKER_TIERS['omniclaude:terra-explorer']).toBe('sonnet')
-  expect(WORKER_TIERS['omniclaude:sol-debugger']).toBe('opus')
-  expect(WORKER_TIERS['omniclaude:astra-expert']).toBe('fable')
+  expect(WORKER_TIERS['omniclaude:haiku-researcher']).toBe('haiku')
+  expect(WORKER_TIERS['omniclaude:sonnet-explorer']).toBe('sonnet')
+  expect(WORKER_TIERS['omniclaude:opus-debugger']).toBe('opus')
+  expect(WORKER_TIERS['omniclaude:fable-expert']).toBe('fable')
 })
 
 test('clampWorkerModel clamps a higher request to the tier id and passes an acceptable one through as given, except under max', async () => {
@@ -72,8 +72,8 @@ test('spawnModel routes built-ins and model-less agents by profile, always namin
   expect(spawnModel('economy', 'Explore', undefined, 'opus')).toBe('claude-haiku-5-5')
   expect(spawnModel('economy', 'general-purpose', undefined, 'haiku')).toBe('haiku')
   expect(spawnModel('max', 'Explore', undefined, 'fable')).toBe('fable')
-  expect(spawnModel('balanced', 'omniclaude:luna-researcher', 'haiku', 'opus')).toBe('claude-haiku-5-5')
-  expect(spawnModel('balanced', 'omniclaude:terra-explorer', 'sonnet', undefined)).toBeUndefined()
+  expect(spawnModel('balanced', 'omniclaude:haiku-researcher', 'haiku', 'opus')).toBe('claude-haiku-5-5')
+  expect(spawnModel('balanced', 'omniclaude:sonnet-explorer', 'sonnet', undefined)).toBeUndefined()
   expect(spawnModel('balanced', 'some-plugin:writer', 'opus', undefined)).toBe('claude-sonnet-5-5')
   expect(spawnModel('balanced', 'some-plugin:writer', undefined, undefined)).toBe('claude-sonnet-5-5')
 })
@@ -88,17 +88,17 @@ test('mainLoopModel rewrites only across tiers, to a full id, and keeps a 1M win
   expect(mainLoopModel('some-proxy-model', 'opus')).toBe('claude-opus-5-5')
 })
 
-test('only Explore, Plan and general-purpose among engine agents are routed; astra is matched under any plugin name', async () => {
+test('only Explore, Plan and general-purpose among engine agents are routed; fable is matched under any plugin name', async () => {
   expect(routesSpawn('Explore', 'engine')).toBe(true)
   expect(routesSpawn('Plan', 'engine')).toBe(true)
   expect(routesSpawn('general-purpose', 'engine')).toBe(true)
   expect(routesSpawn('claude-code-guide', 'engine')).toBe(false)
   expect(routesSpawn('statusline-setup', 'engine')).toBe(false)
   expect(routesSpawn('some-plugin:writer', 'some-plugin')).toBe(true)
-  expect(routesSpawn('omniclaude:terra-explorer', 'omniclaude')).toBe(true)
-  expect(isAstraType('omniclaude:astra-expert')).toBe(true)
-  expect(isAstraType('omniclaude-dev:astra-expert')).toBe(true)
-  expect(isAstraType('astra-expert-helper')).toBe(false)
+  expect(routesSpawn('omniclaude:sonnet-explorer', 'omniclaude')).toBe(true)
+  expect(isAstraType('omniclaude:fable-expert')).toBe(true)
+  expect(isAstraType('omniclaude-dev:fable-expert')).toBe(true)
+  expect(isAstraType('fable-expert-helper')).toBe(false)
   expect(spawnProfile('auto')).toBe('balanced')
   expect(spawnProfile('economy')).toBe('economy')
 })

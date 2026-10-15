@@ -14,19 +14,19 @@ Keep planning, consequential decisions, and final acceptance in the parent conve
 
 | Worker | Use for |
 |---|---|
-| `omniclaude:luna-researcher` | read-only search, docs lookup, extraction, log summaries, routine verification |
-| `omniclaude:terra-explorer` | read-only code mapping, call sites, control and data flow |
-| `omniclaude:terra-implementer` | bounded implementation, ordinary bug fixes, tests |
-| `omniclaude:sol-planner` | architecture and decomposition decisions |
-| `omniclaude:sol-reviewer` | independent review of consequential changes |
-| `omniclaude:sol-debugger` | difficult debugging after a failed attempt |
-| `omniclaude:astra-expert` | only after the user agrees; after a sol worker fails, report the blocker and ask before dispatching |
+| `omniclaude:haiku-researcher` | read-only search, docs lookup, extraction, log summaries, routine verification |
+| `omniclaude:sonnet-explorer` | read-only code mapping, call sites, control and data flow |
+| `omniclaude:sonnet-implementer` | bounded implementation, ordinary bug fixes, tests |
+| `omniclaude:opus-planner` | architecture and decomposition decisions |
+| `omniclaude:opus-reviewer` | independent review of consequential changes |
+| `omniclaude:opus-debugger` | difficult debugging after a failed attempt |
+| `omniclaude:fable-expert` | only after the user agrees; after an opus worker fails, report the blocker and ask before dispatching |
 
 3. Parallelize only independent read-only work. Keep dependent steps, and writes to the same files, in sequence.
 
 ## Hand off
 
-Give each worker the bounded objective, the scope (paths), constraints, acceptance criteria, and the evidence you already have. Do not forward the whole conversation. Always include today's date in luna-researcher handoffs. Do not pass a `model` or `effort` override unless you are deliberately escalating.
+Give each worker the bounded objective, the scope (paths), constraints, acceptance criteria, and the evidence you already have. Do not forward the whole conversation. Always include today's date in haiku-researcher handoffs. Do not pass a `model` or `effort` override unless you are deliberately escalating.
 
 ## Escalate and de-escalate
 
@@ -34,7 +34,7 @@ For checkable work (tests, lint, a reviewer verdict):
 
 1. On failure, diagnose first: missing context, unclear instructions, or a wrong scope.
 2. Retry on the same worker at higher effort.
-3. Then move up one tier at low effort. astra-expert is last, and only after the user agrees.
+3. Then move up one tier at low effort. fable-expert is last, and only after the user agrees.
 
 Return to cheaper workers once the hard phase ends.
 

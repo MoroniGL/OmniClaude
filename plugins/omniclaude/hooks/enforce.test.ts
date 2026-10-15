@@ -81,7 +81,7 @@ test('agent.spawn clamps a worker request above its tier', async ($, on) => {
   const spawned: any[] = []
   on('agent.spawn', async (_$, e) => { spawned.push(e); return { model: e.model ?? 'inherit', agentId: 'a1' } })
   await ready($, on, 'balanced')
-  await $.agent.spawn(SPAWN('omniclaude:luna-researcher', 'opus'))
+  await $.agent.spawn(SPAWN('omniclaude:haiku-researcher', 'opus'))
   expect(spawned[0].model).toBe('claude-haiku-5-5')
 })
 
@@ -89,27 +89,27 @@ test('agent.spawn passes a request within the worker tier through as given', asy
   const spawned: any[] = []
   on('agent.spawn', async (_$, e) => { spawned.push(e); return { model: e.model ?? 'inherit', agentId: 'a1' } })
   await ready($, on, 'balanced')
-  await $.agent.spawn(SPAWN('omniclaude:terra-explorer', 'haiku'))
+  await $.agent.spawn(SPAWN('omniclaude:sonnet-explorer', 'haiku'))
   expect(spawned[0].model).toBe('haiku')
 })
 
-test('astra-expert is denied without consent', async ($, on) => {
+test('fable-expert is denied without consent', async ($, on) => {
   const spawned: any[] = []
   on('agent.spawn', async (_$, e) => { spawned.push(e); return { model: e.model ?? 'inherit', agentId: 'a1' } })
   await ready($, on, 'quality')
-  const denied: any = await $.agent.spawn(SPAWN('omniclaude:astra-expert'))
-  expect(denied.deny).toBe('astra-expert needs your agreement: run /omni astra allow')
+  const denied: any = await $.agent.spawn(SPAWN('omniclaude:fable-expert'))
+  expect(denied.deny).toBe('fable-expert needs your agreement: run /omni fable allow')
   expect(spawned.length).toBe(0)
 })
 
-test('astra-expert is allowed when the session starts on max (max sets the consent flag)', async ($, on) => {
+test('fable-expert is allowed when the session starts on max (max sets the consent flag)', async ($, on) => {
   const spawned: any[] = []
   on('agent.spawn', async (_$, e) => { spawned.push(e); return { model: e.model ?? 'inherit', agentId: 'a1' } })
   await ready($, on, 'max')
-  const allowed: any = await $.agent.spawn(SPAWN('omniclaude:astra-expert'))
+  const allowed: any = await $.agent.spawn(SPAWN('omniclaude:fable-expert'))
   expect(allowed.deny).toBeUndefined()
   expect(spawned.length).toBe(1)
-  expect(spawned[0].subagentType).toBe('omniclaude:astra-expert')
+  expect(spawned[0].subagentType).toBe('omniclaude:fable-expert')
 })
 
 test('turn.complete records the verified model and flags a match in the status line', async ($, on) => {
@@ -147,23 +147,23 @@ test('turn.complete flags a mismatch and ignores subagent turns', async ($, on) 
   expect(badge).toContain('≠ claude-sonnet-5-5')
 })
 
-const ASTRA_DENY = 'astra-expert needs your agreement: run /omni astra allow'
+const FABLE_DENY = 'fable-expert needs your agreement: run /omni fable allow'
 
-test('astra-expert spawned as a teammate is still denied without consent', async ($, on) => {
+test('fable-expert spawned as a teammate is still denied without consent', async ($, on) => {
   const spawned: any[] = []
   on('agent.spawn', async (_$, e) => { spawned.push(e); return { model: e.model ?? 'inherit', agentId: 'a1' } })
   await ready($, on, 'quality')
-  const denied: any = await $.agent.spawn({ ...SPAWN('omniclaude:astra-expert'), isTeammate: true } as any)
-  expect(denied.deny).toBe(ASTRA_DENY)
+  const denied: any = await $.agent.spawn({ ...SPAWN('omniclaude:fable-expert'), isTeammate: true } as any)
+  expect(denied.deny).toBe(FABLE_DENY)
   expect(spawned.length).toBe(0)
 })
 
-test('astra-expert started by a workflow script is still denied without consent', async ($, on) => {
+test('fable-expert started by a workflow script is still denied without consent', async ($, on) => {
   const spawned: any[] = []
   on('agent.spawn', async (_$, e) => { spawned.push(e); return { model: e.model ?? 'inherit', agentId: 'a1' } })
   await ready($, on, 'quality')
-  const denied: any = await $.agent.spawn({ ...SPAWN('omniclaude:astra-expert'), workflow: { runId: 'wf_1', agentIndex: 1 } } as any)
-  expect(denied.deny).toBe(ASTRA_DENY)
+  const denied: any = await $.agent.spawn({ ...SPAWN('omniclaude:fable-expert'), workflow: { runId: 'wf_1', agentIndex: 1 } } as any)
+  expect(denied.deny).toBe(FABLE_DENY)
   expect(spawned.length).toBe(0)
 })
 
@@ -336,12 +336,12 @@ test('a refused write of the spawn record never denies the spawn', async ($, on)
   expect(spawned[0].model).toBe('claude-haiku-5-5')
 })
 
-test('astra-expert under another plugin name is gated too', async ($, on) => {
+test('fable-expert under another plugin name is gated too', async ($, on) => {
   const spawned: any[] = []
   on('agent.spawn', async (_$, e) => { spawned.push(e); return { model: e.model ?? 'inherit', agentId: 'a1' } })
   await ready($, on, 'quality')
-  const denied: any = await $.agent.spawn(SPAWN('omniclaude-dev:astra-expert'))
-  expect(denied.deny).toBe(ASTRA_DENY)
+  const denied: any = await $.agent.spawn(SPAWN('omniclaude-dev:fable-expert'))
+  expect(denied.deny).toBe(FABLE_DENY)
   expect(spawned.length).toBe(0)
 })
 

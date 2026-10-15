@@ -6,14 +6,14 @@ import { PROFILES } from './policy'
 // `$` and `$.state` use lives in register.ts; this file parses commands and formats text.
 
 /** The mod's release version; a Python test keeps it equal to the repository's VERSION file. */
-export const MOD_VERSION = '0.2.0-alpha.1'
+export const MOD_VERSION = '0.3.0-alpha.1'
 
 export type OmniCommand =
   | { kind: 'status' }
   | { kind: 'set'; profile: Profile }
   | { kind: 'save'; profile: Profile }
   | { kind: 'reset' }
-  | { kind: 'astra'; allow: boolean }
+  | { kind: 'fable'; allow: boolean }
   | { kind: 'doctor' }
   | { kind: 'help' }
 
@@ -29,28 +29,28 @@ export function parseOmni(args: string): OmniCommand {
   if (words.length === 1 && isProfile(words[0])) return { kind: 'set', profile: words[0] }
   if (words[0] === 'save' && words.length === 2 && isProfile(words[1])) return { kind: 'save', profile: words[1] }
   if (words[0] === 'reset' && words.length === 1) return { kind: 'reset' }
-  if (words[0] === 'astra' && words.length === 2 && (words[1] === 'allow' || words[1] === 'deny')) return { kind: 'astra', allow: words[1] === 'allow' }
+  if (words[0] === 'fable' && words.length === 2 && (words[1] === 'allow' || words[1] === 'deny')) return { kind: 'fable', allow: words[1] === 'allow' }
   if (words[0] === 'doctor' && words.length === 1) return { kind: 'doctor' }
   return { kind: 'help' }
 }
 
 export const HELP = [
   'OmniClaude: /omni status | economy | balanced | quality | max | auto',
-  '            /omni save <profile> | reset | astra allow|deny | doctor',
+  '            /omni save <profile> | reset | fable allow|deny | doctor',
 ].join('\n')
 
-const MAX_WARNING_HEAD = '\n  warning: max runs the parent on Fable and allows astra-expert;'
+const MAX_WARNING_HEAD = '\n  warning: max runs the parent on Fable and allows fable-expert;'
 export const MAX_WARNING = `${MAX_WARNING_HEAD} Fable may bill usage credits on some plans. This consent is cleared when you leave max.`
-/** Entering max when an explicit `/omni astra allow` is already on: max did not grant it, so leaving max will not clear it. */
-export const MAX_WARNING_KEPT = `${MAX_WARNING_HEAD} Fable may bill usage credits on some plans; your earlier /omni astra allow stays in force.`
+/** Entering max when an explicit `/omni fable allow` is already on: max did not grant it, so leaving max will not clear it. */
+export const MAX_WARNING_KEPT = `${MAX_WARNING_HEAD} Fable may bill usage credits on some plans; your earlier /omni fable allow stays in force.`
 
-export const MAX_STATUS = 'omni:max · Fable parent; astra-expert allowed — may bill usage credits'
-const MAX_STATUS_NO_ASTRA = 'omni:max · Fable parent — may bill usage credits; astra-expert needs /omni astra allow'
+export const MAX_STATUS = 'omni:max · Fable parent; fable-expert allowed — may bill usage credits'
+const MAX_STATUS_NO_FABLE = 'omni:max · Fable parent — may bill usage credits; fable-expert needs /omni fable allow'
 
-/** The short badge `/omni` and session.start draw; max says whether astra-expert is allowed right now. */
+/** The short badge `/omni` and session.start draw; max says whether fable-expert is allowed right now. */
 export function badge(profile: Profile, consent: boolean): string {
   if (profile !== 'max') return `omni:${profile}`
-  return consent ? MAX_STATUS : MAX_STATUS_NO_ASTRA
+  return consent ? MAX_STATUS : MAX_STATUS_NO_FABLE
 }
 
 /** The `/omni save` suffix: the saved profile applies now only when no session override stands in front of it. */
@@ -64,9 +64,9 @@ export function saveNote(profile: Profile, override: unknown): string {
 export function policySection(profile: Profile): string {
   return [
     `OmniClaude (omni:${profile}) is active: a plugin hook sets this conversation's model and effort from the profile and routes Explore, Plan, general-purpose and other plugins' subagents to its tiers (other engine built-ins are left alone);`,
-    'OmniClaude workers (omniclaude:luna-researcher, omniclaude:terra-explorer, omniclaude:terra-implementer, omniclaude:sol-*) keep their own tiers (a higher request is clamped back except under max); forks, teammates and workflow agents are not routed.',
-    'Prefer omniclaude:terra-explorer for codebase mapping and omniclaude:luna-researcher for docs/search instead of reading many files yourself; use omniclaude:terra-implementer for bounded implementation; keep tiny single-file work here.',
-    'omniclaude:astra-expert is refused until the user agrees (/omni astra allow, or the max profile). Details: the omniclaude:routing skill.',
+    'OmniClaude workers (omniclaude:haiku-researcher, omniclaude:sonnet-explorer, omniclaude:sonnet-implementer, omniclaude:opus-*) keep their own tiers (a higher request is clamped back except under max); forks, teammates and workflow agents are not routed.',
+    'Prefer omniclaude:sonnet-explorer for codebase mapping and omniclaude:haiku-researcher for docs/search instead of reading many files yourself; use omniclaude:sonnet-implementer for bounded implementation; keep tiny single-file work here.',
+    'omniclaude:fable-expert is refused until the user agrees (/omni fable allow, or the max profile). Details: the omniclaude:routing skill.',
   ].join(' ')
 }
 
@@ -106,7 +106,7 @@ export function formatStatus(v: StatusView): string {
     `  applied (last step): ${v.applied ? `${v.applied.model}/${String(v.applied.effort ?? 'default')}` : 'none yet'}`,
     `  verified (last turn, API-reported): ${v.verified ? v.verified.model : 'none yet'}`,
     `  last spawn: ${v.lastSpawn ? `${v.lastSpawn.subagentType} → ${v.lastSpawn.model ?? 'unchanged'}` : 'none yet'}`,
-    `  astra consent: ${v.consent ? (v.consentFromMax ? 'yes (set by max)' : 'yes') : 'no'}`,
+    `  fable consent: ${v.consent ? (v.consentFromMax ? 'yes (set by max)' : 'yes') : 'no'}`,
     `  mod version: ${MOD_VERSION}`,
   ].join('\n')
 }
@@ -115,7 +115,7 @@ export function doctorText(version: string): string {
   return [
     'OmniClaude doctor',
     `  engine: ${version}`,
-    '  hooks: session.start, command.run, prompt.submit (auto classifier), turn.step (main loop model/effort), agent.spawn (tiers, astra consent), prompt.compose (policy section), turn.complete (verified)',
+    '  hooks: session.start, command.run, prompt.submit (auto classifier), turn.step (main loop model/effort), agent.spawn (tiers, fable consent), prompt.compose (policy section), turn.complete (verified)',
     '  if /omni is missing in a session, the mod is off (--bare, --safe-mode, disableAllHooks, allowManagedModsOnly, remote switch, engine < 2.1.287); Stage 1 skill and agents still work.',
   ].join('\n')
 }

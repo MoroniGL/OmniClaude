@@ -7,19 +7,19 @@ import unittest
 from tests.frontmatter import PLUGIN, parse, split_list
 
 AGENTS = {
-    "luna-researcher": ("haiku", "medium"),
-    "terra-explorer": ("sonnet", "low"),
-    "terra-implementer": ("sonnet", "medium"),
-    "sol-planner": ("opus", "medium"),
-    "sol-reviewer": ("opus", "medium"),
-    "sol-debugger": ("opus", "high"),
-    "astra-expert": ("fable", "low"),
+    "haiku-researcher": ("haiku", "medium"),
+    "sonnet-explorer": ("sonnet", "low"),
+    "sonnet-implementer": ("sonnet", "medium"),
+    "opus-planner": ("opus", "medium"),
+    "opus-reviewer": ("opus", "medium"),
+    "opus-debugger": ("opus", "high"),
+    "fable-expert": ("fable", "low"),
 }
 ALLOWLISTS = {
-    "luna-researcher": {"Read", "Grep", "Glob", "WebSearch", "WebFetch"},
-    "terra-explorer": {"Read", "Grep", "Glob", "Bash"},
+    "haiku-researcher": {"Read", "Grep", "Glob", "WebSearch", "WebFetch"},
+    "sonnet-explorer": {"Read", "Grep", "Glob", "Bash"},
 }
-NO_WRITE = {"sol-planner", "sol-reviewer"}
+NO_WRITE = {"opus-planner", "opus-reviewer"}
 COLORS = {"red", "blue", "green", "yellow", "purple", "orange", "pink", "cyan"}
 AGENT_DIR = PLUGIN / "agents"
 
